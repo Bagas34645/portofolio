@@ -32,14 +32,15 @@ export async function POST(request: Request) {
   const resend = new Resend(apiKey);
 
   const { error } = await resend.emails.send({
-    from: "Portofolio <onboarding@resend.dev>",
-    to: siteConfig.email,
+    from: process.env.CONTACT_FROM_EMAIL ?? "Portofolio <onboarding@resend.dev>",
+    to: process.env.CONTACT_TO_EMAIL ?? siteConfig.email,
     replyTo: email,
     subject: `Pesan portofolio dari ${name}`,
     text: `Nama: ${name}\nEmail: ${email}\n\n${message}`,
   });
 
   if (error) {
+    console.error(`[contact] Resend error: ${error.name} — ${error.message}`);
     return NextResponse.json(
       { error: "Gagal mengirim email. Coba lagi nanti." },
       { status: 502 },

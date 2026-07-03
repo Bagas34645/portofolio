@@ -28,6 +28,8 @@ Salin `.env.example` menjadi `.env.local`:
 | Variabel | Kegunaan |
 | --- | --- |
 | `RESEND_API_KEY` | Mengirim email dari form kontak via [Resend](https://resend.com). Jika kosong, form otomatis menawarkan fallback `mailto:`. |
+| `CONTACT_TO_EMAIL` | Alamat tujuan pesan form kontak. **Penting:** pada mode testing Resend (tanpa domain terverifikasi), email hanya bisa dikirim ke alamat email akun Resend Anda sendiri. |
+| `CONTACT_FROM_EMAIL` | Alamat pengirim. Default `Portofolio <onboarding@resend.dev>` (mode testing). Setelah verifikasi domain di [resend.com/domains](https://resend.com/domains), ganti dengan alamat di domain Anda. |
 
 ## Struktur Folder
 
