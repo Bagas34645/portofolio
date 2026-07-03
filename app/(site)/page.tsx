@@ -1,9 +1,10 @@
 import Link from "next/link";
-import { ArrowRight, Download, Trophy } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { getProjects } from "@/lib/content";
 import { awards, techStackPreview } from "@/lib/data";
 import { Hero } from "@/components/sections/hero";
 import { ProjectCard } from "@/components/sections/project-card";
+import { AwardCard } from "@/components/sections/award-card";
 import { Reveal, StaggerList, StaggerItem } from "@/components/shared/motion";
 import { Badge } from "@/components/ui/badge";
 
@@ -83,48 +84,11 @@ export default function HomePage() {
           </h2>
         </Reveal>
         <StaggerList className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
-          {awards.map((award) => {
-            const inner = (
-              <>
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-accent-soft text-accent">
-                  <Trophy className="h-5 w-5" aria-hidden="true" />
-                </div>
-                <div className="flex-1">
-                  <p className="font-mono text-xs text-accent">{award.year}</p>
-                  <h3 className="mt-1 text-sm font-semibold leading-snug">
-                    {award.title}
-                  </h3>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {award.detail}
-                  </p>
-                </div>
-                {award.certificateUrl && (
-                  <Download
-                    className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground transition-colors group-hover:text-accent"
-                    aria-hidden="true"
-                  />
-                )}
-              </>
-            );
-
-            return (
-              <StaggerItem key={award.title}>
-                {award.certificateUrl ? (
-                  <a
-                    href={award.certificateUrl}
-                    download={award.certificateFilename}
-                    className="group flex h-full gap-4 rounded-xl border border-border bg-card p-5 transition-colors hover:border-accent hover:bg-muted"
-                  >
-                    {inner}
-                  </a>
-                ) : (
-                  <div className="flex h-full gap-4 rounded-xl border border-border bg-card p-5">
-                    {inner}
-                  </div>
-                )}
-              </StaggerItem>
-            );
-          })}
+          {awards.map((award) => (
+            <StaggerItem key={award.title}>
+              <AwardCard award={award} />
+            </StaggerItem>
+          ))}
         </StaggerList>
       </section>
     </>
