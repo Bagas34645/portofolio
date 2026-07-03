@@ -1,0 +1,76 @@
+---
+title: "AppKasir — Aplikasi Point of Sale (POS) Desktop"
+summary: "Aplikasi POS desktop end-to-end untuk operasional toko retail: penjualan, pembelian, retur, stok, pelaporan, dan cetak struk."
+categories: ["Desktop"]
+techStack:
+  [
+    "Java (JDK 11)",
+    "Java Swing",
+    "FlatLaf",
+    "MySQL (JDBC)",
+    "JasperReports",
+    "JFreeChart",
+    "Barbecue",
+    "Apache Ant",
+  ]
+role: "Merancang dan mengembangkan aplikasi POS desktop end-to-end"
+featured: true
+order: 3
+cover: "/images/projects/appkasir-pos/cover.svg"
+---
+
+## Gambaran Umum
+
+AppKasir adalah aplikasi kasir (Point of Sale) desktop yang dirancang untuk membantu usaha retail mengelola transaksi jual-beli secara cepat, akurat, dan terintegrasi. Mulai dari transaksi penjualan, pembelian, retur, manajemen stok produk, hingga pelaporan penjualan dengan cetak struk otomatis.
+
+Aplikasi mendukung multi-pengguna dengan hak akses berbasis peran (Admin dan Kasir), pengelolaan data master (produk, kategori, supplier, pelanggan, karyawan), serta dashboard grafik penjualan.
+
+## Masalah Utama
+
+Toko retail kecil-menengah sering mencatat transaksi secara manual atau dengan aplikasi kasir sederhana yang tidak mencakup alur lengkap: pembelian dari supplier, retur dua arah, dan sinkronisasi stok. Akibatnya stok sering tidak akurat, laporan sulit disusun, dan tidak ada pemisahan wewenang antara kasir dan pemilik.
+
+## Constraint dan Tantangan
+
+1. **Alur transaksi yang saling terkait** : penjualan, pembelian, retur penjualan, dan retur pembelian semuanya harus memutasi stok secara konsisten.
+2. **Lingkungan offline** : toko tidak selalu punya internet stabil, sehingga aplikasi harus berjalan penuh sebagai desktop app dengan database lokal.
+3. **Kode harus tetap terkelola** : dengan 21 tabel dan puluhan form, tanpa disiplin arsitektur kode Swing cepat menjadi spaghetti.
+
+## Arsitektur Sistem
+
+Aplikasi dibangun dengan **arsitektur berlapis (layered architecture)** yang memisahkan tanggung jawab tiap komponen:
+
+<LayeredArchDiagram />
+
+- **Model** : representasi objek data (entity).
+- **DAO (Data Access Object)** : seluruh operasi database terisolasi di lapisan ini.
+- **Service** : logika bisnis, dengan pola interface–implementasi.
+- **Form / JDialog** : lapisan antarmuka pengguna (presentation).
+- **TableModel** : pengelolaan data pada komponen tabel (JTable).
+
+Database terdiri dari **21 tabel yang saling terelasi**, mencakup data master, transaksi (penjualan, pembelian, retur beserta detailnya), dan tabel penomoran transaksi otomatis.
+
+## Alasan Pemilihan Teknologi dan Trade-off
+
+| Keputusan | Alternatif | Alasan |
+| --- | --- | --- |
+| Java Swing desktop | Aplikasi web | Berjalan offline penuh, akses langsung ke printer struk dan barcode |
+| Layered architecture | Kode langsung di form | Logika bisnis bisa diuji dan diubah tanpa menyentuh UI; DAO memudahkan perubahan skema |
+| JasperReports untuk dokumen | Cetak manual via Graphics2D | Template dokumen (struk, nota, label) bisa didesain visual dan diubah tanpa rekompilasi logika |
+| FlatLaf Look and Feel | Swing default | UI modern dengan tema Light/Dark dan ikon SVG, tanpa meninggalkan ekosistem Swing |
+
+## Highlight Implementasi
+
+- **Autentikasi & RBAC**: login dengan enkripsi password **SHA-256**, pembatasan menu berdasarkan peran Admin/Kasir.
+- **Transaksi penjualan** dengan penomoran otomatis dan pengurangan stok real-time; **transaksi pembelian** dari supplier dengan penambahan stok.
+- **Retur penjualan & retur pembelian** untuk kedua alur transaksi.
+- **Modul pelaporan & pencetakan**: struk kasir, nota pembelian, nota retur, dan label harga via **JasperReports 6.20 + iText**; generate **barcode produk** dengan Barbecue.
+- **Dashboard analitik** tren penjualan dengan JFreeChart.
+- Pencarian data dengan paginasi, ganti password, dan tema **Light/Dark** (FlatLaf).
+
+## Hasil dan Dampak
+
+Seluruh alur operasional toko dari pembelian barang ke supplier hingga struk di tangan pelanggan tercatat dalam satu aplikasi dengan stok yang selalu sinkron. Pemilik toko mendapat laporan dan grafik penjualan tanpa rekap manual.
+
+## Pelajaran yang Dipetik
+
+- **Desktop belum mati.** Untuk kasus offline-first dengan integrasi hardware (printer, barcode), aplikasi desktop masih pilihan paling pragmatis.

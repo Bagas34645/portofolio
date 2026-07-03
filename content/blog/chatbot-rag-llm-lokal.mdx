@@ -1,0 +1,76 @@
+---
+title: "Membangun Chatbot RAG dengan LLM Lokal: Trade-off Ollama vs API Komersial"
+description: "Kenapa saya menjalankan Gemma2:2b lewat Ollama alih-alih memanggil API komersial — dan kenapa kualitas retrieval lebih penting dari ukuran model."
+date: "2026-04-02"
+tags: ["Machine Learning", "RAG", "LLM", "Python"]
+---
+
+Ketika membangun chatbot RAG untuk knowledge base bertema lingkungan hidup, keputusan pertama yang harus diambil: **LLM-nya jalan di mana?** Dua kandidatnya jelas — API komersial (kualitas tinggi, bayar per-request) atau model lokal via Ollama (gratis, tapi lebih kecil).
+
+Saya memilih lokal: **Gemma2:2b** lewat Ollama. Ini alasannya.
+
+## Anatomi pipeline RAG
+
+Pipeline terdiri dari dua fase. Fase indexing dijalankan sekali setiap knowledge base berubah:
+
+```python title="knowledge_embed.py"
+from sentence_transformers import SentenceTransformer
+import pandas as pd
+
+model = SentenceTransformer("BAAI/bge-m3")
+df = pd.read_csv("knowledge_base.csv")
+
+for _, row in df.iterrows():
+    embedding = model.encode(row["pertanyaan"] + " " + row["jawaban"])
+    cursor.execute(
+        "INSERT INTO knowledge (text, embedding) VALUES (%s, %s)",
+        (row["jawaban"], str(embedding.tolist())),
+    )
+```
+
+Fase retrieval + generation berjalan di setiap pertanyaan pengguna:
+
+```python title="chat_bot.py"
+def answer(query: str) -> str:
+    query_vec = model.encode(query)
+
+    # Vector search di TiDB Cloud: top-K dokumen terdekat
+    cursor.execute(
+        """SELECT text, vec_cosine_distance(embedding, %s) AS d
+           FROM knowledge ORDER BY d ASC LIMIT 3""",
+        (str(query_vec.tolist()),),
+    )
+    context = "\n".join(row[0] for row in cursor.fetchall())
+
+    # Generation dengan LLM lokal
+    return ollama.generate(
+        model="gemma2:2b",
+        prompt=f"Jawab berdasarkan konteks berikut.\n{context}\n\nPertanyaan: {query}",
+    )
+```
+
+## Kenapa model 2B parameter cukup
+
+Intuisi awal saya salah: saya mengira kualitas jawaban ditentukan ukuran model generatif. Ternyata di arsitektur RAG, **tugas berat sudah dipindahkan ke retrieval**. Model tidak perlu "tahu" jawabannya — dia hanya perlu merangkai konteks yang sudah disodorkan menjadi kalimat natural.
+
+Yang jauh lebih menentukan justru kualitas embedding. **BAAI/bge-m3** dipilih karena multilingual (penting untuk bahasa Indonesia) dan performa retrieval-nya kuat di benchmark MTEB.
+
+## Perbandingan yang sebenarnya
+
+| Aspek | Ollama (Gemma2:2b) | API Komersial |
+| --- | --- | --- |
+| Biaya per-request | Rp0 | Terus berjalan, membesar seiring trafik |
+| Privasi data | Penuh — data tidak keluar server | Data dikirim ke pihak ketiga |
+| Kualitas generasi | Cukup untuk merangkai konteks | Lebih halus, penalaran lebih kuat |
+| Ketergantungan | Tidak ada vendor lock-in | Rate limit, perubahan harga, deprecation |
+| Infrastruktur | Butuh server dengan RAM memadai | Nol |
+
+Untuk knowledge base tertutup dengan constraint privasi dan biaya, kolom kiri menang. Kalau use case-nya penalaran terbuka multi-langkah, kolom kanan layak dibayar.
+
+## Satu database untuk relasional + vektor
+
+Pilihan yang juga menghemat banyak kerumitan: **TiDB Cloud Vector Search** alih-alih vector database terpisah. Query vektor (`vec_cosine_distance`) berjalan lewat koneksi MySQL biasa (SSL) — tidak ada infrastruktur baru, tidak ada sinkronisasi dua penyimpanan.
+
+## Kesimpulan
+
+RAG mengubah pertanyaan "seberapa pintar modelmu?" menjadi "seberapa relevan konteks yang kamu berikan?". Begitu bingkainya bergeser, model kecil yang lokal, privat, dan gratis menjadi jawaban yang rasional — bukan kompromi.

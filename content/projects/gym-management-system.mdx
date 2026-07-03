@@ -1,0 +1,97 @@
+---
+title: "Gym Management Information System"
+summary: "Sistem informasi terintegrasi web + mobile untuk seluruh operasional gym: pengelolaan member, membership, absensi, trainer, laporan, notifikasi, dan fitur check-in otomatis via face recognition."
+categories: ["Full-Stack", "Machine Learning / AI"]
+techStack:
+  [
+    "Laravel 13",
+    "PHP 8.3",
+    "PostgreSQL",
+    "Next.js 16",
+    "React 19",
+    "Tailwind CSS 4",
+    "Flutter",
+    "FastAPI",
+    "ONNX Runtime",
+    "InsightFace",
+  ]
+role: "Merancang dan membangun sistem full-stack multi-platform end-to-end"
+featured: true
+order: 1
+cover: "/images/projects/gym-management-system/cover.svg"
+---
+
+## Gambaran Umum
+
+Gym Management Information System adalah sistem informasi terintegrasi berbasis web dan mobile untuk mengelola seluruh operasional gym: manajemen member, membership, absensi, personal trainer, laporan, dan notifikasi. Fitur unggulannya adalah **check-in otomatis menggunakan face recognition** di kiosk. Member cukup menghadap kamera, sistem mengenali wajah dan mencatat kehadiran.
+
+Sistem menyatukan proses operasional yang sebelumnya manual dan tersebar menjadi satu platform terpusat, sehingga admin dapat memonitor bisnis secara real-time dan member dapat mengakses layanan gym secara mandiri melalui aplikasi mobile.
+
+## Masalah Utama
+
+Operasional gym umumnya berjalan manual dan tersebar di banyak tempat: pencatatan member di spreadsheet, absensi di buku, jadwal trainer lewat chat. Akibatnya:
+
+- Admin tidak punya visibilitas real-time terhadap kondisi bisnis (member aktif, membership yang akan expired, tren kehadiran).
+- Member tidak punya layanan mandiri untuk cek sisa membership atau booking sesi trainer harus bertanya ke resepsionis.
+- Proses check-in lambat dan mudah dimanipulasi (titip absen).
+
+## Constraint dan Tantangan
+
+1. **Multi-platform dalam satu sistem** : admin butuh dashboard web, member butuh aplikasi mobile, dan kiosk check-in butuh antarmuka khusus. Semuanya harus konsisten membaca satu sumber data.
+2. **Face recognition menyentuh data biometrik** : data paling sensitif yang mungkin disimpan sistem. Kebocoran embedding wajah tidak bisa "direset" seperti password.
+3. **Kiosk harus cepat** : identifikasi 1:N harus berjalan dalam hitungan detik agar antrean check-in tidak menumpuk.
+4. **Skala kode besar untuk tim kecil** : 43 functional requirement harus tetap terkelola rapi.
+
+## Arsitektur Sistem
+
+Sistem terdiri dari **4 komponen** yang saling terintegrasi:
+
+<GymArchitectureDiagram />
+
+1. **Backend REST API (Laravel)** : pusat logika bisnis dan data. Semua klien hanya berbicara dengan API ini.
+2. **Dashboard Admin + Kiosk (Next.js)** : manajemen operasional dan antarmuka check-in wajah.
+3. **Aplikasi Mobile Member (Flutter)** : layanan mandiri member: profil, membership, riwayat absensi, booking trainer.
+4. **Microservice Face Recognition (FastAPI)** : deteksi wajah dan ekstraksi embedding.
+
+Keputusan arsitektur terpenting: **microservice face recognition tidak pernah diakses langsung oleh klien**. Laravel bertindak sebagai orkestrator yang memanggil microservice secara server-to-server. Dengan pola ini:
+
+- Endpoint ML tidak terekspos ke publik, attack surface mengecil drastis.
+- Otorisasi tetap satu pintu di Laravel (JWT + RBAC), tidak perlu duplikasi logika auth di service Python.
+- Embedding wajah disimpan **terenkripsi** di database; microservice bersifat stateless.
+
+## Alasan Pemilihan Teknologi dan Trade-off
+
+| Keputusan | Alternatif | Alasan memilih |
+| --- | --- | --- |
+| Laravel sebagai orkestrator | Klien akses FastAPI langsung | Keamanan satu pintu; biometrik tidak terekspos; konsistensi audit log |
+| FastAPI + ONNX Runtime untuk ML | Menanam inference di Laravel | Ekosistem ML Python jauh lebih matang; inference bisa di-scale terpisah |
+| PostgreSQL | MySQL | Kebutuhan tipe data kaya dan integritas relasional untuk 31 migration |
+| Flutter untuk mobile | React Native | Satu codebase Android/iOS dengan performa render konsisten; GetX untuk state management ringan |
+| JWT httpOnly cookie di web | Token di localStorage | Mitigasi XSS: token tidak bisa dibaca JavaScript |
+| InsightFace (SCRFD + ArcFace) | Layanan cloud face API | Privasi data biometrik tetap on-premise; tanpa biaya per-request |
+
+## Highlight Implementasi
+
+- **Autentikasi JWT end-to-end** (mobile, web, API) dengan refresh token, **Google Sign-In**, dan reset password berbasis **OTP**.
+- **Pipeline face recognition lengkap**: registrasi wajah, verifikasi 1:1, dan identifikasi 1:N untuk kiosk check-in dengan *quality gate* (foto blur/gelap ditolak sebelum masuk pipeline). Embedding 512-dimensi dibandingkan dengan cosine similarity.
+- **Manajemen member & membership**: CRUD, import/export CSV/XLSX, aktivasi, perpanjangan (renewal), approval, dan monitoring expired.
+- **Dashboard admin** dengan KPI cards dan grafik tren real-time (Recharts).
+- **Manajemen trainer**: penjadwalan, booking sesi, workout plan, dan tracking latihan harian (set/reps/weight).
+- **Laporan** member, absensi, dan keuangan dengan export PDF/Excel.
+
+## Skala Teknis
+
+- **70+ endpoint** REST API
+- **27 model** Eloquent dan **31 migration** database
+- **43 functional requirement** (REQ-001 s/d REQ-043)
+- RBAC **3 role**: member, admin, super_admin
+
+## Hasil dan Dampak
+
+Seluruh proses operasional gym dari pendaftaran member hingga laporan keuangan berjalan di satu platform. Check-in yang sebelumnya manual menjadi otomatis dan tahan manipulasi karena berbasis wajah. Admin mendapat monitoring real-time; member mendapat layanan mandiri penuh dari aplikasi mobile.
+
+## Pelajaran yang Dipetik
+
+- **Keamanan harus by-default, bukan afterthought.** Enkripsi embedding wajah dan isolasi microservice ML sejak awal jauh lebih ringan dibanding menutup celah keamanan setelah sistem sudah rilis.
+- **Kontrak API adalah fondasi kerja multi-platform.** Dengan tiga klien berbeda (web, mobile, kiosk), mendesain REST API dengan disiplin sejak awal menghindarkan rework besar.
+- **Pisahkan concern berdasarkan beban kerja.** Inference ML punya karakteristik resource yang berbeda dari CRUD bisnis memisahkannya sebagai microservice membuat keduanya bisa dioptimalkan sendiri-sendiri.

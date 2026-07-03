@@ -1,0 +1,82 @@
+---
+title: "Chatbot RAG (Retrieval-Augmented Generation)"
+summary: "Chatbot berbasis RAG yang memadukan vector search dengan LLM lokal untuk jawaban akurat dan kontekstual; knowledge base bertema lingkungan hidup."
+categories: ["Machine Learning / AI"]
+techStack:
+  [
+    "Python",
+    "Ollama (Gemma2:2b)",
+    "SentenceTransformers",
+    "BAAI/bge-m3",
+    "TiDB Cloud Vector Search",
+    "Pandas",
+    "MySQL",
+  ]
+role: "Merancang dan mengimplementasikan pipeline RAG end-to-end"
+featured: true
+order: 2
+cover: "/images/projects/chatbot-rag/cover.svg"
+---
+
+## Gambaran Umum
+
+Chatbot cerdas berbasis arsitektur **RAG (Retrieval-Augmented Generation)** yang mampu menjawab pertanyaan pengguna secara kontekstual dan akurat. Chatbot menggabungkan pencarian dokumen berbasis semantik (vector search) dengan Large Language Model yang berjalan **lokal**, sehingga jawaban berlandaskan basis pengetahuan yang telah disiapkan, bukan karangan model.
+
+Studi kasus knowledge base pada proyek ini bertema **lingkungan hidup**: daur ulang, energi terbarukan, perubahan iklim, dan topik terkait.
+
+## Masalah Utama
+
+Masalahnya, LLM biasa sering berhalusinasi seperti menjawab dengan yakin walau salah. Untuk kasus yang membutuhkan jawaban akurat, jawaban harus benar-benar berdasar pada dokumen sumber yang bisa dicek ulang.
+
+## Constraint dan Tantangan
+
+1. **Privasi data** : data knowledge base dan pertanyaan pengguna tidak boleh dikirim ke API pihak ketiga.
+2. **Biaya operasional** : solusi berbasis API komersial menimbulkan biaya per-request yang terus berjalan.
+3. **Kualitas retrieval** : jawaban hanya sebaik dokumen yang diambil; pencarian keyword biasa tidak cukup untuk menangkap makna pertanyaan.
+
+## Arsitektur dan Alur Kerja
+
+<RagPipelineDiagram />
+
+Pipeline terdiri dari dua fase:
+
+### 1. Indexing / Embedding (`knowledge_embed.py`)
+
+- Membaca data pengetahuan dari file CSV (pasangan pertanyaan–jawaban).
+- Mengubah teks menjadi vektor embedding menggunakan model **BAAI/bge-m3** (SentenceTransformers).
+- Menyimpan teks beserta embedding-nya ke **TiDB Cloud** yang mendukung Vector Search.
+
+### 2. Retrieval & Generation (`chat_bot.py`)
+
+- Menerima pertanyaan (query) dari pengguna.
+- Meng-embed query, lalu mencari dokumen paling relevan menggunakan **cosine distance** (`vec_cosine_distance`), mengambil top-K dokumen terdekat.
+- Menggabungkan dokumen relevan sebagai konteks.
+- Mengirim konteks + pertanyaan ke LLM **Gemma2:2b** (via Ollama) untuk menghasilkan jawaban akhir yang natural dan berbasis fakta.
+
+## Alasan Pemilihan Teknologi dan Trade-off
+
+| Keputusan | Alternatif | Trade-off |
+| --- | --- | --- |
+| LLM lokal via Ollama (Gemma2:2b) | API komersial (GPT, Gemini) | Kualitas generasi lebih rendah dari model frontier, tapi privasi data terjaga penuh dan biaya operasional mendekati nol |
+| BAAI/bge-m3 untuk embedding | Embedding API berbayar | Model multilingual yang kuat untuk bahasa Indonesia, berjalan lokal tanpa biaya per-request |
+| TiDB Cloud Vector Search | Vector DB khusus (Pinecone, Qdrant) | Satu database untuk data relasional + vektor; koneksi MySQL standar (SSL) tanpa infrastruktur tambahan |
+
+Trade-off terpenting: **LLM lokal dipilih demi privasi data dan menekan biaya operasional**. Gemma2:2b cukup untuk menghasilkan jawaban natural karena tugas beratnya (mencari fakta) sudah dipindahkan ke tahap retrieval.
+
+## Highlight Implementasi
+
+- Pipeline RAG end-to-end dari proses embedding data hingga penyajian jawaban.
+- Integrasi vector search di TiDB Cloud untuk pencarian semantik yang efisien.
+- Koneksi database melalui `mysql-connector-python` dengan SSL.
+- Pemrosesan data knowledge base menggunakan Pandas.
+
+## Hasil dan Dampak
+
+- Chatbot mampu memberikan jawaban relevan dan akurat sesuai basis pengetahuan.
+- Risiko halusinasi berkurang signifikan karena jawaban ditopang dokumen sumber (*grounded answers*).
+
+## Pelajaran yang Dipetik
+
+- **RAG adalah soal retrieval, bukan cuma LLM.** Kualitas embedding dan strategi pencarian menentukan kualitas jawaban lebih besar daripada ukuran model generatifnya.
+- **Model kecil + konteks tepat > model besar tanpa konteks.** Gemma2:2b yang diberi dokumen relevan menjawab lebih akurat daripada model besar yang mengarang.
+- **Pilih teknologi berdasarkan constraint, bukan tren.** Constraint privasi dan biaya mengarah ke Ollama, meskipun API komersial lebih mudah dipakai.

@@ -1,0 +1,71 @@
+---
+title: "Website E-Commerce UMKM Sentra Durian Tegal"
+summary: "Website e-commerce full-stack untuk membantu UMKM lokal menjual durian online: katalog, keranjang, checkout dengan pembayaran online, dan panel admin (CMS)."
+categories: ["Web", "Full-Stack"]
+techStack:
+  [
+    "PHP 8.2",
+    "Laravel 12",
+    "Blade",
+    "Bootstrap 5",
+    "MySQL",
+    "Midtrans",
+    "Vite",
+  ]
+role: "Merancang dan membangun website dari awal — front-end dan back-end"
+featured: false
+order: 5
+cover: "/images/projects/web-umkm-sentra-durian/cover.svg"
+---
+
+## Gambaran Umum
+
+Website Sentra Durian Tegal ("Rajane Duren") adalah aplikasi web e-commerce yang dibangun untuk membantu UMKM lokal memasarkan dan menjual produk durian secara online. Proyek dikembangkan dengan **Laravel 12** dan **PHP 8.2**, menerapkan arsitektur **MVC**, Blade sebagai template engine, dan Bootstrap 5 untuk tampilan responsif.
+
+Sistem terdiri dari dua sisi: **sisi publik/pelanggan** (katalog, keranjang, checkout, pembayaran online) dan **sisi admin** (CMS lengkap untuk produk, pesanan, galeri, testimoni, dan konten halaman).
+
+## Masalah Utama
+
+UMKM penjual durian mengandalkan penjualan offline dan chat manual. Tidak ada katalog terpusat, pencatatan pesanan tercecer, dan pembayaran harus dikonfirmasi manual satu per satu proses yang lambat dan rawan kesalahan.
+
+## Constraint dan Tantangan
+
+1. **Pembayaran online harus dipercaya pembeli** : integrasi payment gateway resmi lebih meyakinkan daripada transfer manual.
+2. **Pemilik toko bukan orang teknis** : seluruh konten (produk, galeri, testimoni, halaman) harus bisa dikelola dari panel admin tanpa menyentuh kode.
+3. **Dua jenis pengguna dengan wewenang sangat berbeda** : pelanggan dan admin harus terpisah tegas sejak autentikasi.
+
+## Arsitektur Sistem
+
+Aplikasi mengikuti pola **MVC Laravel** dengan pemisahan dua area:
+
+- **Area publik/pelanggan** : katalog, pencarian, keranjang, checkout, riwayat pesanan, profil, testimoni.
+- **Area admin (CMS)** : dashboard statistik, manajemen produk, pesanan, galeri, testimoni, konten, export CSV.
+
+Kedua area dilindungi **middleware terpisah** (admin vs pelanggan) sehingga otorisasi tegas di level routing. Skema database dirancang dengan migration Laravel; pembayaran ditangani callback **Midtrans**.
+
+## Alasan Pemilihan Teknologi dan Trade-off
+
+| Keputusan | Alternatif | Alasan |
+| --- | --- | --- |
+| Laravel 12 (MVC monolith) | SPA + API terpisah | Satu codebase yang mudah dipelihara untuk skala UMKM; SEO katalog bagus dengan render server |
+| Midtrans | Konfirmasi transfer manual | Pembayaran otomatis terverifikasi, mendukung banyak metode bayar lokal |
+| Blade + Bootstrap 5 | React/Vue | Kecepatan pengembangan; tidak ada kebutuhan interaktivitas kompleks di sisi pelanggan |
+| MySQL (SQLite untuk dev) | — | Standar hosting Indonesia; SQLite mempercepat iterasi lokal |
+
+## Highlight Implementasi
+
+- **Integrasi payment gateway Midtrans** untuk pembayaran online end-to-end.
+- **Sistem keranjang belanja** (tambah, ubah jumlah, hapus) dan **checkout dengan auto-fill** data pelanggan.
+- **CMS lengkap**: CRUD produk dengan upload gambar, manajemen pesanan (update status + konfirmasi pembayaran), galeri, persetujuan testimoni, pesan kontak, konten halaman, dan **export pesanan ke CSV**.
+- **Autentikasi & middleware terpisah** untuk admin vs pelanggan (role-based).
+- Registrasi, login, manajemen profil, dan riwayat pesanan pelanggan.
+
+## Hasil dan Dampak
+
+UMKM memiliki etalase online dengan pembayaran otomatis pesanan masuk tercatat rapi, status pembayaran terverifikasi Midtrans, dan seluruh konten website bisa dikelola sendiri oleh pemilik melalui CMS tanpa bantuan developer.
+
+## Pelajaran yang Dipetik
+
+- **Monolith yang rapi sering kali pilihan tepat.** Untuk skala UMKM, Laravel MVC satu codebase lebih mudah di-deploy dan dipelihara daripada arsitektur terdistribusi.
+- **Integrasi pihak ketiga butuh desain alur yang teliti** menangani callback pembayaran Midtrans dengan benar (status pending/settlement/expire) adalah inti dari kepercayaan pengguna.
+- **Bangun untuk pengguna akhir yang sebenarnya.** CMS yang lengkap menentukan apakah website terus hidup setelah serah terima.

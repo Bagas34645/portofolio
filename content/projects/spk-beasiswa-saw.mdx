@@ -1,0 +1,77 @@
+---
+title: "Sistem Pendukung Keputusan Penerimaan Beasiswa (Metode SAW)"
+summary: "Aplikasi web SPK untuk menyeleksi dan merangking calon penerima beasiswa secara objektif dengan metode Simple Additive Weighting."
+categories: ["Web"]
+techStack:
+  [
+    "PHP Native",
+    "MySQL/MariaDB",
+    "Bootstrap 4",
+    "jQuery",
+    "DataTables",
+    "Chosen",
+    "FPDF",
+  ]
+role: "Full-Stack Web Developer — perancangan, pengembangan, dan implementasi"
+featured: false
+order: 4
+cover: "/images/projects/spk-beasiswa-saw/cover.svg"
+demoUrl: "https://bagasabiyukumara.my.id/projects/spksaw/"
+---
+
+## Gambaran Umum
+
+Sistem Pendukung Keputusan (SPK) Penerimaan Beasiswa adalah aplikasi web yang membantu pihak sekolah mengambil keputusan pemberian beasiswa secara lebih **objektif, cepat, dan transparan**. Aplikasi menggantikan proses seleksi manual dengan perhitungan otomatis menggunakan metode **Simple Additive Weighting (SAW)**.
+
+> Demo live tersedia di [bagasabiyukumara.my.id/projects/spksaw](https://bagasabiyukumara.my.id/projects/spksaw/).
+
+## Masalah Utama
+
+Seleksi beasiswa manual lambat, subjektif, dan tidak transparan. Panitia harus membandingkan banyak kandidat dengan beberapa kriteria sekaligus tanpa metode baku, sehingga hasilnya sulit dipertanggungjawabkan.
+
+## Constraint dan Tantangan
+
+1. **Hasil harus bisa dipertanggungjawabkan** : setiap ranking harus bisa ditelusuri kembali ke perhitungan matematisnya.
+2. **Multi-level pengguna** : Super Admin, Sub Admin, dan Pimpinan punya wewenang berbeda; menu dan aksi harus mengikuti peran.
+3. **Infrastruktur sekolah sederhana** : aplikasi harus berjalan di shared hosting / XAMPP standar tanpa dependensi berat.
+
+## Cara Kerja Metode SAW
+
+Metode SAW bekerja dengan **normalisasi matriks keputusan**, lalu menjumlahkan hasil perkalian nilai ternormalisasi dengan bobot tiap kriteria. Kriteria dan bobot yang digunakan:
+
+| Kriteria | Bobot | Jenis |
+| --- | --- | --- |
+| Pendapatan Orang Tua | 0.5 | Cost (semakin kecil semakin baik) |
+| Nilai Rata-Rata | 0.3 | Benefit (semakin besar semakin baik) |
+| Jumlah Saudara | 0.2 | Benefit |
+
+Nilai preferensi tiap kandidat dihitung dengan:
+
+```text
+V = (0.5 × normalisasi_pendapatan)
+  + (0.3 × normalisasi_nilai)
+  + (0.2 × normalisasi_saudara)
+```
+
+Kandidat dengan nilai preferensi tertinggi menjadi kandidat terbaik penerima beasiswa.
+
+## Alasan Pemilihan Teknologi dan Trade-off
+
+| Keputusan | Alternatif | Alasan |
+| --- | --- | --- |
+| PHP Native | Framework (Laravel/CI) | Berjalan di hosting paling sederhana; tim sekolah mudah memelihara |
+| SAW | AHP / TOPSIS | Perhitungan transparan dan mudah diverifikasi manual oleh panitia non-teknis |
+| FPDF | Print browser | Laporan resmi berformat konsisten untuk arsip sekolah |
+| DataTables | Tabel HTML statis | Pencarian, sorting, dan pagination tanpa menulis backend tambahan |
+
+## Highlight Implementasi
+
+- **Implementasi algoritma SAW** end-to-end: normalisasi matriks keputusan + pembobotan kriteria untuk perangkingan otomatis.
+- **RBAC multi-level** (Super Admin, Sub Admin, Pimpinan) dengan menu navigasi **dinamis** sesuai peran.
+- CRUD data siswa, pengguna, dan pendaftaran beasiswa per tahun.
+- **Laporan hasil perangkingan PDF otomatis** menggunakan FPDF.
+- Tabel data interaktif (pencarian, sorting, pagination) dengan DataTables dan select box Chosen.
+
+## Hasil dan Dampak
+
+Proses seleksi yang sebelumnya manual menjadi otomatis dan objektif. Panitia tinggal memasukkan data kandidat; sistem menghasilkan ranking beserta laporan PDF yang siap diarsipkan. Transparansi meningkat karena perhitungan mengikuti metode baku yang bisa diaudit.

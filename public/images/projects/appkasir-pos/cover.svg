@@ -1,0 +1,13 @@
+<!-- TODO: ganti dengan screenshot asli (cover.png) lalu perbarui frontmatter `cover` di content/projects/appkasir-pos.mdx -->
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#431407"/>
+      <stop offset="100%" stop-color="#ea580c"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#g)"/>
+  <text x="80" y="290" font-family="monospace" font-size="52" font-weight="bold" fill="#ffffff">AppKasir  POS Desktop</text>
+  <text x="80" y="360" font-family="monospace" font-size="28" fill="#fed7aa">Java Swing · MySQL · JasperReports</text>
+  <text x="80" y="560" font-family="monospace" font-size="20" fill="#fdba74">[ placeholder  ganti dengan screenshot asli ]</text>
+</svg>
