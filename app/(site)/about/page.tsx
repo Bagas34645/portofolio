@@ -3,6 +3,10 @@ import { Download, GraduationCap, Trophy, Rocket, BadgeCheck } from "lucide-reac
 import { siteConfig } from "@/lib/site";
 import { certifications, timeline, techStackPreview } from "@/lib/data";
 import { Reveal, StaggerList, StaggerItem } from "@/components/shared/motion";
+import {
+  PhotoSlideshow,
+  type Slide,
+} from "@/components/sections/photo-slideshow";
 import { Badge } from "@/components/ui/badge";
 import { buttonClasses } from "@/components/ui/button";
 
@@ -18,6 +22,59 @@ const timelineIcons = {
   award: Trophy,
   project: Rocket,
 } as const;
+
+const gallerySlides: Slide[] = [
+  {
+    src: "/images/about/slide-01.jpg",
+    alt: "Bagas menerima sertifikat penghargaan di depan papan tulis",
+    caption: "Menerima sertifikat penghargaan Top 3 Best Project Cyber Security",
+  },
+  {
+    src: "/images/about/slide-02.jpg",
+    alt: "Bagas presentasi bersama tim dengan jas almamater di depan kelas",
+    caption: "Presentasi bersama tim",
+  },
+  {
+    src: "/images/about/slide-03.jpg",
+    alt: "Bagas berbicara menggunakan mikrofon pada sebuah acara",
+    caption: "Menjadi pembicara pada sebuah project seminar IoT (Internet of Things)",
+  },
+  {
+    src: "/images/about/slide-04.jpg",
+    alt: "Bagas dan rekan memandu sesi acara di depan peserta",
+    caption: "Memandu sesi acara bersama rekan",
+  },
+  {
+    src: "/images/about/slide-05.jpg",
+    alt: "Bagas memandu pelatihan komputer di laboratorium",
+    caption: "Memandu pelatihan komputer",
+  },
+  {
+    src: "/images/about/slide-06.jpg",
+    alt: "Suasana kelas pelatihan komputer yang dipandu Bagas",
+    caption: "Suasana kelas pelatihan komputer",
+  },
+  {
+    src: "/images/about/slide-07.jpg",
+    alt: "Bagas kecil belajar menggunakan komputer",
+    caption: "Masa kecil: pertama kali mengenal komputer",
+  },
+  {
+    src: "/images/about/slide-08.jpg",
+    alt: "Bagas kecil mengetik di depan komputer lama",
+    caption: "Masa kecil: belajar mengetik di komputer",
+  },
+  {
+    src: "/images/about/slide-09.jpg",
+    alt: "Bagas fokus bekerja dengan laptop",
+    caption: "Fokus mengerjakan proyek",
+  },
+  {
+    src: "/images/about/slide-10.jpg",
+    alt: "Bagas mengerjakan kode di laptop",
+    caption: "Coding",
+  },
+];
 
 export default function AboutPage() {
   return (
@@ -52,6 +109,21 @@ export default function AboutPage() {
             harus mempertimbangkan biaya.
           </p>
         </div>
+      </Reveal>
+
+      <Reveal delay={0.1}>
+        <section className="mt-12" aria-labelledby="galeri-heading">
+          <h2 id="galeri-heading" className="text-2xl font-bold tracking-tight">
+            Galeri Kegiatan
+          </h2>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Dari pertama kali mengenal komputer hingga memandu pelatihan dan
+            menjadi pembicara.
+          </p>
+          <div className="mt-6">
+            <PhotoSlideshow slides={gallerySlides} />
+          </div>
+        </section>
       </Reveal>
 
       <Reveal delay={0.1}>
