@@ -92,6 +92,8 @@ export type Award = {
   year: string;
   title: string;
   detail: string;
+  certificateUrl?: string;
+  certificateFilename?: string;
 };
 
 export const awards: Award[] = [
@@ -99,11 +101,15 @@ export const awards: Award[] = [
     year: "2025",
     title: "Top 3 Best Project Workshop Cyber Security",
     detail: "National IT Workshop INVOFEST 2025",
+    certificateUrl: "/images/awards/top3-invofest-2025.jpg",
+    certificateFilename: "Top 3 Best Project INVOFEST 2025.jpg",
   },
   {
     year: "2024",
     title: "Juara 1 Lomba Apresiasi GTK PAUD dan DIKMAS",
     detail: "Kategori Instruktur LKP Tingkat Kota Tegal",
+    certificateUrl: "/images/awards/juara1-gtk-2024.jpg",
+    certificateFilename: "Juara 1 GTK PAUD DIKMAS 2024.jpg",
   },
   {
     year: "2019",
