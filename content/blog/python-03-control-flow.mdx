@@ -1,0 +1,246 @@
+---
+title: "Python Tutorial (3): Control Flow: Percabangan dan Perulangan"
+description: "if/elif/else, for loop, while loop, comprehension, match-case, dan teknik iterasi Pythonic."
+date: "2026-03-10"
+series: "Python"
+tags: ["Python", "Fundamental", "Control Flow", "Loop"]
+---
+
+Control flow menentukan alur eksekusi program, yaitu kapan kode dijalankan, dilewati, atau diulang. Python menyediakan sintaks yang bersih dan beberapa pattern unik.
+
+## if / elif / else
+
+```python
+score = 85
+
+if score >= 90:
+    grade = "A"
+elif score >= 80:
+    grade = "B"
+elif score >= 70:
+    grade = "C"
+else:
+    grade = "D"
+
+print(f"Grade: {grade}")   # Grade: B
+```
+
+### Conditional Expression (Ternary)
+
+```python
+status = "dewasa" if age >= 18 else "anak-anak"
+result = x if x > 0 else -x   # absolute value
+```
+
+### Truthiness dalam Kondisi
+
+```python
+items = [1, 2, 3]
+
+if items:           # True jika list tidak kosong
+    print("Ada item")
+
+name = ""
+if not name:        # True jika string kosong
+    name = "Anonymous"
+```
+
+## for Loop
+
+Python `for` iterasi atas **iterable** seperti list, string, range, dict, file, dll.
+
+```python
+# Iterasi list
+fruits = ["apel", "jeruk", "mangga"]
+for fruit in fruits:
+    print(fruit)
+
+# range(start, stop, step)
+for i in range(5):          # 0, 1, 2, 3, 4
+    print(i)
+
+for i in range(2, 10, 2):  # 2, 4, 6, 8
+    print(i)
+
+# enumerate: index + value
+for i, fruit in enumerate(fruits):
+    print(f"{i}: {fruit}")
+
+# zip: iterasi paralel
+names = ["Alice", "Bob"]
+scores = [90, 85]
+for name, score in zip(names, scores):
+    print(f"{name}: {score}")
+
+# Iterasi dictionary
+config = {"host": "localhost", "port": 8080}
+for key, value in config.items():
+    print(f"{key} = {value}")
+
+# Iterasi string
+for char in "Python":
+    print(char)
+```
+
+## while Loop
+
+```python
+count = 0
+while count < 5:
+    print(count)
+    count += 1
+
+# Input loop
+while True:
+    answer = input("Ketik 'quit' untuk keluar: ")
+    if answer == "quit":
+        break
+```
+
+## break, continue, else
+
+```python
+# break: keluar dari loop
+for n in range(100):
+    if n > 10:
+        break
+    print(n)
+
+# continue: skip iterasi saat ini
+for n in range(10):
+    if n % 2 == 0:
+        continue    # skip genap
+    print(n)        # hanya ganjil
+
+# for...else: else dieksekusi jika loop selesai tanpa break
+for n in range(2, 100):
+    for i in range(2, int(n**0.5) + 1):
+        if n % i == 0:
+            break
+    else:
+        print(f"{n} adalah bilangan prima")
+```
+
+## Comprehension
+
+Cara Pythonic membuat collection baru dari iterasi:
+
+```python
+# List comprehension
+squares = [x**2 for x in range(10)]
+evens = [x for x in range(20) if x % 2 == 0]
+pairs = [(x, y) for x in range(3) for y in range(3)]
+
+# Dict comprehension
+word_lengths = {word: len(word) for word in ["hello", "world", "python"]}
+# {'hello': 5, 'world': 5, 'python': 6}
+
+# Set comprehension
+unique_lengths = {len(word) for word in ["hi", "hello", "hey"]}
+# {2, 5, 3}
+
+# Generator expression (lazy, hemat memory)
+total = sum(x**2 for x in range(1000000))
+```
+
+### Kapan Comprehension vs Loop?
+
+- **Comprehension**: transformasi sederhana, 1-2 kondisi
+- **Loop biasa**: logika kompleks, side effects, multi-step
+
+```python
+# Terlalu kompleks untuk comprehension, pakai loop
+results = []
+for item in data:
+    processed = transform(item)
+    if validate(processed):
+        results.append(processed)
+```
+
+## match-case (Python 3.10+)
+
+Structural pattern matching, lebih powerful dari switch/case biasa:
+
+```python
+command = input("Command: ")
+
+match command.split():
+    case ["quit"]:
+        print("Exiting...")
+    case ["hello", name]:
+        print(f"Hello, {name}!")
+    case ["add", *numbers]:
+        total = sum(int(n) for n in numbers)
+        print(f"Sum: {total}")
+    case _:
+        print("Unknown command")
+```
+
+```python
+# Pattern matching dengan tipe
+def process(value):
+    match value:
+        case int(n) if n > 0:
+            return f"Positive int: {n}"
+        case str(s) if len(s) > 0:
+            return f"Non-empty string: {s}"
+        case [first, *rest]:
+            return f"List starting with {first}"
+        case {"name": name, "age": age}:
+            return f"{name} is {age}"
+        case _:
+            return "Unknown"
+```
+
+## Teknik Iterasi Lanjutan
+
+```python
+from itertools import chain, product, groupby
+
+# Chain: gabung multiple iterables
+combined = list(chain([1, 2], [3, 4], [5]))
+# [1, 2, 3, 4, 5]
+
+# Product: cartesian product
+for size, color in product(["S", "M", "L"], ["red", "blue"]):
+    print(f"{size}-{color}")
+
+# Reversed
+for item in reversed(fruits):
+    print(item)
+
+# Sorted dengan key
+students = [("Alice", 90), ("Bob", 85), ("Charlie", 92)]
+for name, score in sorted(students, key=lambda x: x[1], reverse=True):
+    print(f"{name}: {score}")
+```
+
+## Walrus Operator := (Python 3.8+)
+
+Assignment expression: assign dan gunakan dalam satu ekspresi:
+
+```python
+# Tanpa walrus
+line = input()
+while line != "quit":
+    print(f"You said: {line}")
+    line = input()
+
+# Dengan walrus
+while (line := input()) != "quit":
+    print(f"You said: {line}")
+
+# Dalam comprehension
+results = [y for x in data if (y := expensive_func(x)) > threshold]
+```
+
+## Latihan Praktis
+
+1. Buat program FizzBuzz (1-100): cetak "Fizz" jika kelipatan 3, "Buzz" jika 5, "FizzBuzz" jika keduanya
+2. Dari list angka, gunakan comprehension untuk membuat dict `{angka: kuadrat}` hanya untuk bilangan ganjil
+3. Implementasi binary search dengan while loop
+4. Gunakan match-case untuk parser command sederhana (calculator)
+
+## Rangkuman
+
+Control flow Python bersih dan ekspresif. Comprehension membuat kode ringkas, `for...else` unik untuk search pattern, dan match-case membawa pattern matching modern. Selanjutnya: **fungsi dan modul**.

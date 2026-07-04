@@ -1,0 +1,417 @@
+---
+title: "Python Tutorial (12): Packaging dan Deployment"
+description: "Build distributable packages, publish ke PyPI, Docker container untuk Python, CI/CD pipeline, dan production deployment patterns."
+date: "2026-04-25"
+series: "Python"
+tags: ["Python", "Expert", "Packaging", "Docker", "CI/CD", "Deployment"]
+---
+
+Tutorial penutup seri ini membawa kode Python dari development ke production: packaging untuk distribusi, containerization, dan CI/CD automation.
+
+## Python Packaging Modern
+
+### pyproject.toml (PEP 621)
+
+```toml
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "mypackage"
+version = "1.0.0"
+description = "A useful Python package"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.11"
+authors = [
+    { name = "Alice", email = "alice@example.com" },
+]
+dependencies = [
+    "requests>=2.28",
+    "pydantic>=2.0",
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0", "ruff>=0.1", "mypy>=1.5"]
+
+[project.scripts]
+mycli = "mypackage.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/alice/mypackage"
+Documentation = "https://mypackage.readthedocs.io"
+```
+
+### Project Layout
+
+```text
+mypackage/
+├── pyproject.toml
+├── README.md
+├── LICENSE
+├── src/
+│   └── mypackage/
+│       ├── __init__.py
+│       ├── core.py
+│       ├── cli.py
+│       └── utils.py
+├── tests/
+│   ├── conftest.py
+│   └── test_core.py
+└── docs/
+```
+
+### Build & Publish
+
+```bash
+# Build
+pip install build
+python -m build
+# Creates dist/mypackage-1.0.0.tar.gz dan dist/mypackage-1.0.0-py3-none-any.whl
+
+# Upload ke PyPI
+pip install twine
+twine upload dist/*
+
+# Upload ke Test PyPI dulu
+twine upload --repository testpypi dist/*
+pip install --index-url https://test.pypi.org/simple/ mypackage
+```
+
+### Version Management
+
+```bash
+# Manual di pyproject.toml
+# atau dynamic versioning
+
+# hatch
+pip install hatch
+hatch version minor    # 1.0.0 → 1.1.0
+
+# setuptools-scm (version dari git tags)
+```
+
+```toml
+[tool.hatch.version]
+path = "src/mypackage/__init__.py"
+```
+
+```python
+# src/mypackage/__init__.py
+__version__ = "1.0.0"
+```
+
+## CLI Application: Click / Typer
+
+```python
+# src/mypackage/cli.py
+import typer
+
+app = typer.Typer()
+
+@app.command()
+def hello(name: str, count: int = 1):
+    """Greet someone."""
+    for _ in range(count):
+        typer.echo(f"Hello, {name}!")
+
+@app.command()
+def serve(port: int = 8000, reload: bool = False):
+    """Start the server."""
+    typer.echo(f"Starting server on port {port}")
+
+if __name__ == "__main__":
+    app()
+```
+
+```bash
+# Setelah install:
+mycli hello Alice --count 3
+mycli serve --port 9000 --reload
+```
+
+## Docker untuk Python
+
+### Dockerfile Production
+
+```dockerfile
+FROM python:3.12-slim AS builder
+
+WORKDIR /app
+
+RUN pip install --no-cache-dir uv
+
+COPY pyproject.toml uv.lock ./
+RUN uv sync --frozen --no-dev --no-editable
+
+FROM python:3.12-slim
+
+WORKDIR /app
+
+RUN groupadd -r appuser && useradd -r -g appuser appuser
+
+COPY --from=builder /app/.venv /app/.venv
+COPY src/ ./src/
+
+ENV PATH="/app/.venv/bin:$PATH"
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+
+USER appuser
+
+EXPOSE 8000
+
+HEALTHCHECK --interval=30s --timeout=3s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"
+
+CMD ["python", "-m", "mypackage.server"]
+```
+
+### Docker Compose Development
+
+```yaml
+services:
+  app:
+    build:
+      context: .
+      target: builder    # development stage
+    volumes:
+      - ./src:/app/src   # hot reload
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgres://user:pass@db:5432/myapp
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: pass
+      POSTGRES_DB: myapp
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready"]
+      interval: 5s
+
+  redis:
+    image: redis:7-alpine
+
+volumes:
+  pgdata:
+```
+
+### .dockerignore
+
+```text
+.git
+.venv
+__pycache__
+*.pyc
+.env
+.mypy_cache
+.pytest_cache
+.ruff_cache
+dist
+docs
+tests
+```
+
+## CI/CD: GitHub Actions
+
+```yaml
+# .github/workflows/ci.yml
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Set up Python
+        run: uv python install ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: uv sync --all-extras
+
+      - name: Lint
+        run: uv run ruff check src/
+
+      - name: Type check
+        run: uv run mypy src/
+
+      - name: Test
+        run: uv run pytest --cov=src --cov-fail-under=80
+
+  publish:
+    needs: test
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build
+        run: |
+          pip install build
+          python -m build
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets.PYPI_API_TOKEN }}
+```
+
+## Production Deployment Patterns
+
+### ASGI Server (FastAPI/Starlette)
+
+```bash
+# uvicorn: ASGI server
+uvicorn mypackage.app:app --host 0.0.0.0 --port 8000 --workers 4
+
+# gunicorn + uvicorn workers
+gunicorn mypackage.app:app -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000
+```
+
+### Environment Configuration
+
+```python
+from pydantic_settings import BaseSettings
+
+
+class Settings(BaseSettings):
+    database_url: str
+    redis_url: str = "redis://localhost:6379"
+    debug: bool = False
+    secret_key: str
+    allowed_hosts: list[str] = ["*"]
+
+    class Config:
+        env_file = ".env"
+
+
+settings = Settings()
+```
+
+### Health Check Endpoint
+
+```python
+from fastapi import FastAPI
+
+app = FastAPI()
+
+@app.get("/health")
+async def health():
+    checks = {
+        "database": await check_database(),
+        "redis": await check_redis(),
+    }
+    healthy = all(checks.values())
+    return {"status": "healthy" if healthy else "unhealthy", "checks": checks}
+```
+
+### Structured Logging
+
+```python
+import structlog
+
+structlog.configure(
+    processors=[
+        structlog.processors.TimeStamper(fmt="iso"),
+        structlog.processors.add_log_level,
+        structlog.processors.JSONRenderer(),
+    ]
+)
+
+logger = structlog.get_logger()
+logger.info("request_processed", method="GET", path="/api/users", duration_ms=42)
+# {"event": "request_processed", "method": "GET", "path": "/api/users", "duration_ms": 42, "level": "info", "timestamp": "2026-04-25T..."}
+```
+
+## Release Workflow
+
+```text
+1. Develop di feature branch
+2. PR → CI runs (lint, type check, test)
+3. Merge ke main
+4. Tag release: git tag v1.2.0
+5. CI builds + publishes to PyPI
+6. Docker image pushed to registry
+7. Deploy (rolling update / blue-green)
+```
+
+```bash
+# Semantic versioning
+git tag v1.0.0
+git push origin v1.0.0   # triggers publish workflow
+```
+
+## Monitoring di Production
+
+```python
+# Prometheus metrics
+from prometheus_client import Counter, Histogram
+
+REQUEST_COUNT = Counter("http_requests_total", "Total requests", ["method", "path", "status"])
+REQUEST_DURATION = Histogram("http_request_duration_seconds", "Request duration")
+
+@app.middleware("http")
+async def metrics_middleware(request, call_next):
+    with REQUEST_DURATION.time():
+        response = await call_next(request)
+    REQUEST_COUNT.labels(
+        method=request.method,
+        path=request.url.path,
+        status=response.status_code,
+    ).inc()
+    return response
+```
+
+## Penutup Seri Python
+
+Selamat! Anda telah menyelesaikan 12 tutorial Python dari fundamental hingga production deployment:
+
+| Level | Tutorial |
+|-------|----------|
+| Fundamental | Setup, tipe data, control flow, fungsi |
+| Intermediate | OOP, file I/O, virtual env |
+| Advanced | Iterator/generator/decorator, concurrency, testing |
+| Expert | Type hints, packaging, deployment |
+
+Langkah selanjutnya: pilih domain (web, data, ML, DevOps), build real projects, contribute ke open source, dan terus belajar dari production experience.
+
+## Latihan Praktis
+
+1. Package project ke distributable wheel, install di venv bersih
+2. Buat Dockerfile multi-stage, jalankan dengan docker-compose
+3. Setup GitHub Actions CI: lint + type check + test + coverage
+4. Deploy ke cloud (Railway/Fly.io/DigitalOcean) dengan health check
+
+## Rangkuman
+
+Packaging + Docker + CI/CD mengubah kode Python menjadi software yang bisa didistribusikan, di-deploy, dan di-maintain di production. Seri dilanjutkan di bab 13–18: **RegEx, datetime, database, data science, visualisasi, dan machine learning** yang melengkapi kurikulum lengkap dari pemula hingga professional developer.

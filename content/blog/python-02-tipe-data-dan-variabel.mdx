@@ -1,0 +1,388 @@
+---
+title: "Python Tutorial (2): Tipe Data, Variabel, dan Operator"
+description: "String, integer, float, boolean, list, tuple, dict, set, operator aritmetika/logika, variabel global, dan operasi dasar Python."
+date: "2026-03-05"
+series: "Python"
+tags: ["Python", "Fundamental", "Data Types", "Variables", "Operators"]
+---
+
+Python adalah bahasa **dynamically typed**, artinya variabel tidak perlu deklarasi tipe eksplisit. Tapi memahami tipe data dan operator tetap krusial untuk menulis kode yang benar dan efisien.
+
+## Aturan Penamaan Variabel
+
+```python
+nama_lengkap = "Alice"    # snake_case (standar Python)
+umur2 = 25                # angka OK, tidak di awal
+_private = "internal"     # konvensi: leading underscore = internal
+
+# TIDAK valid:
+# 2nama = "x"             # SyntaxError: diawali angka
+# class = "x"             # SyntaxError: kata kunci
+# my-var = 1              # SyntaxError: minus bukan underscore
+```
+
+Konvensi PEP 8: gunakan `snake_case` untuk variabel dan fungsi, `UPPER_CASE` untuk konstanta, `PascalCase` untuk class.
+
+## Variabel dan Assignment
+
+```python
+nama = "Alice"          # str
+umur = 25               # int
+tinggi = 165.5          # float
+aktif = True            # bool
+
+# Multiple assignment
+x, y, z = 1, 2, 3
+a = b = c = 0
+
+# Type check
+type(nama)    # <class 'str'>
+isinstance(umur, int)   # True
+```
+
+Python menggunakan **duck typing**: "jika berjalan seperti bebek dan bersuara seperti bebek, maka itu bebek."
+
+## Tipe Numerik
+
+```python
+# Integer: presisi tak terbatas
+besar = 10**100
+biner = 0b1010      # 10
+oktal = 0o17        # 15
+heksa = 0xFF        # 255
+
+# Float: IEEE 754 double precision
+pi = 3.14159
+scientific = 1.5e-3   # 0.0015
+
+# Operasi
+10 / 3      # 3.3333 (true division)
+10 // 3     # 3 (floor division)
+10 % 3      # 1 (modulo)
+2 ** 10     # 1024 (power)
+
+# Konversi
+int("42")       # 42
+float("3.14")   # 3.14
+int(3.99)       # 3 (truncate, bukan round)
+round(3.7)      # 4
+```
+
+## String
+
+String Python immutable. Setiap operasi menghasilkan string baru.
+
+```python
+s = "Hello, World"
+s2 = 'Single quotes juga OK'
+multi = """String
+multi-baris"""
+
+# Indexing & slicing
+s[0]        # 'H'
+s[-1]       # 'd'
+s[0:5]      # 'Hello'
+s[7:]       # 'World'
+s[::-1]     # 'dlroW ,olleH' (reverse)
+
+# Methods
+"hello".upper()              # 'HELLO'
+"  spaces  ".strip()         # 'spaces'
+"a,b,c".split(",")          # ['a', 'b', 'c']
+", ".join(["a", "b", "c"])  # 'a, b, c'
+"hello".replace("l", "L")   # 'heLLo'
+"hello world".title()        # 'Hello World'
+"abc123".isalnum()           # True
+
+# f-string (Python 3.6+): format terbaik
+name = "Alice"
+age = 30
+f"Nama: {name}, Umur: {age}"
+f"Pi = {3.14159:.2f}"        # 'Pi = 3.14'
+f"{'center':^20}"            # '      center      '
+
+# Escape characters
+print("Baris pertama\nBaris kedua")   # newline
+print("Tab\tseparated")               # tab
+print("Quote: \"hello\"")             # escaped quote
+print(r"C:\Users\Alice")             # raw string, backslash literal
+
+# Format alternatif
+"Nama: {}, Umur: {}".format(name, age)
+"Nama: {n}, Umur: {a}".format(n=name, a=age)
+"Pi = {:.2f}".format(3.14159)
+```
+
+## Operator
+
+### Aritmetika
+
+```python
+10 + 3    # 13
+10 - 3    # 7
+10 * 3    # 30
+10 / 3    # 3.333... (true division, selalu float)
+10 // 3   # 3 (floor division)
+10 % 3    # 1 (modulo/sisa bagi)
+2 ** 10   # 1024 (pangkat)
+```
+
+### Assignment
+
+```python
+x = 10
+x += 5      # x = x + 5
+x -= 2
+x *= 3
+x /= 2
+x //= 2
+x %= 3
+x **= 2
+```
+
+### Perbandingan
+
+```python
+5 == 5      # True
+5 != 3      # True
+5 > 3       # True
+5 >= 5      # True
+5 < 10      # True
+5 <= 5      # True
+
+# Chain comparison (Pythonic)
+1 < x < 10
+```
+
+### Logika
+
+```python
+True and False    # False
+True or False     # True
+not True          # False
+```
+
+### Identity dan Membership
+
+```python
+a = [1, 2, 3]
+b = a
+c = [1, 2, 3]
+
+a is b        # True (objek sama di memory)
+a is c        # False (konten sama, objek berbeda)
+a == c        # True (nilai sama)
+
+1 in a        # True
+4 not in a    # True
+"d" in "hello"  # False
+```
+
+### Bitwise
+
+```python
+5 & 3     # 1  (AND)
+5 | 3     # 7  (OR)
+5 ^ 3     # 6  (XOR)
+~5        # -6 (NOT)
+5 << 1    # 10 (shift left)
+5 >> 1    # 2  (shift right)
+```
+
+### Precedence (prioritas)
+
+Dari tinggi ke rendah: `**` → `* / // %` → `+ -` → `<< >>` → `&` → `^ |` → perbandingan → `not` → `and` → `or`. Gunakan tanda kurung jika ragu.
+
+## Variabel Global
+
+```python
+counter = 0
+
+def increment():
+    global counter
+    counter += 1
+
+increment()
+print(counter)   # 1
+```
+
+Hindari `global` kecuali benar-benar perlu. Lebih baik gunakan return value atau class untuk state.
+
+## Boolean
+
+```python
+True, False
+
+# Truthy / Falsy
+bool(0)       # False
+bool("")      # False
+bool([])      # False
+bool(None)    # False
+bool(1)       # True
+bool("hi")    # True
+bool([1])     # True
+```
+
+Operator logika sudah dibahas di bagian Operator di atas.
+
+## List: Ordered, Mutable
+
+```python
+fruits = ["apel", "jeruk", "mangga"]
+mixed = [1, "dua", 3.0, True]
+
+# Akses & slice
+fruits[0]          # 'apel'
+fruits[-1]         # 'mangga'
+fruits[1:3]        # ['jeruk', 'mangga']
+
+# Mutasi
+fruits.append("durian")
+fruits.insert(1, "pisang")
+fruits.remove("jeruk")
+popped = fruits.pop()       # remove & return last
+fruits.extend(["nanas", "kelapa"])
+
+# Operasi
+len(fruits)
+"apel" in fruits           # True
+sorted(fruits)             # sorted copy
+fruits.sort()              # in-place sort
+fruits.reverse()
+
+# List comprehension
+squares = [x**2 for x in range(10)]
+evens = [x for x in range(20) if x % 2 == 0]
+```
+
+## Tuple: Ordered, Immutable
+
+```python
+point = (3, 4)
+single = (42,)          # koma penting untuk single-element
+rgb = (255, 128, 0)
+
+x, y = point            # unpacking
+_, y = point            # ignore first
+
+# Namedtuple: tuple dengan nama field
+from collections import namedtuple
+Point = namedtuple("Point", ["x", "y"])
+p = Point(3, 4)
+p.x, p.y               # 3, 4
+```
+
+Gunakan tuple untuk data yang tidak boleh berubah (koordinat, config, return multiple values).
+
+## Dictionary: Key-Value Pairs
+
+```python
+user = {
+    "name": "Alice",
+    "age": 30,
+    "active": True,
+}
+
+# Akses
+user["name"]                    # 'Alice'
+user.get("email", "N/A")       # 'N/A' (default jika key tidak ada)
+
+# Mutasi
+user["email"] = "alice@mail.com"
+del user["active"]
+user.pop("age")                 # remove & return
+
+# Iterasi
+for key, value in user.items():
+    print(f"{key}: {value}")
+
+user.keys()
+user.values()
+
+# Dict comprehension
+squares = {x: x**2 for x in range(5)}
+# {0: 0, 1: 1, 2: 4, 3: 9, 4: 16}
+
+# Merge (Python 3.9+)
+defaults = {"theme": "dark", "lang": "id"}
+overrides = {"lang": "en"}
+config = defaults | overrides
+
+# Nested dictionary
+company = {
+    "name": "TechCorp",
+    "employees": {
+        "alice": {"role": "Engineer", "salary": 15000000},
+        "bob": {"role": "Designer", "salary": 12000000},
+    },
+}
+company["employees"]["alice"]["role"]   # 'Engineer'
+
+# Copy
+import copy
+shallow = company.copy()
+deep = copy.deepcopy(company)
+```
+
+## Set: Unordered, Unique
+
+```python
+colors = {"red", "green", "blue"}
+nums = set([1, 2, 2, 3, 3])    # {1, 2, 3}
+
+colors.add("yellow")
+colors.discard("red")
+
+# Operasi himpunan
+a = {1, 2, 3, 4}
+b = {3, 4, 5, 6}
+a | b      # union: {1, 2, 3, 4, 5, 6}
+a & b      # intersection: {3, 4}
+a - b      # difference: {1, 2}
+a ^ b      # symmetric difference: {1, 2, 5, 6}
+```
+
+## Frozenset: Immutable Set
+
+```python
+fs = frozenset([1, 2, 3, 3])   # frozenset({1, 2, 3})
+# fs.add(4)                     # AttributeError, tidak bisa diubah
+
+# Berguna sebagai key dictionary atau elemen set
+cache = {frozenset([1, 2]): "result_a"}
+```
+
+## None: Null Python
+
+```python
+result = None
+
+if result is None:
+    print("Belum ada hasil")
+
+# Gunakan `is` bukan `==` untuk None
+```
+
+## Type Conversion
+
+```python
+int("10")        # 10
+str(42)          # '42'
+list("abc")      # ['a', 'b', 'c']
+tuple([1, 2])    # (1, 2)
+set([1, 1, 2])   # {1, 2}
+dict([("a", 1), ("b", 2)])  # {'a': 1, 'b': 2}
+```
+
+## Latihan Praktis
+
+1. Buat dictionary kontak (nama → nomor HP), tambah/hapus entry
+2. Dari list angka, buat list comprehension yang hanya ambil bilangan prima
+3. Gunakan set untuk menemukan elemen duplikat di sebuah list
+4. Buat program yang menghitung frekuensi setiap karakter dalam string
+5. Demonstrasi perbedaan `is` vs `==` dengan list yang kontennya sama
+6. Hitung luas lingkaran dengan operator aritmetika: `pi * r ** 2`
+
+## Rangkuman
+
+Python memiliki tipe data yang kaya dan operator lengkap. List untuk koleksi berurutan, dict untuk mapping, set untuk uniqueness, tuple/frozenset untuk data immutable. Kuasai operator dan comprehension sebelum lanjut ke control flow.

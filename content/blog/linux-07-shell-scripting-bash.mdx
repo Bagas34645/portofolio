@@ -1,0 +1,272 @@
+---
+title: "Linux Tutorial (7): Shell Scripting Bash: Dari Dasar hingga Production"
+description: "Variabel, control flow, fungsi, argument parsing, error handling dengan set -euo pipefail, dan best practice script production."
+date: "2026-02-01"
+series: "Linux"
+tags: ["Linux", "Intermediate", "Bash", "Automation"]
+---
+
+Shell scripting adalah glue code paling universal di Linux. Backup otomatis, deployment, health check, dan cron job semuanya ditulis dalam Bash. Tutorial ini membawa Anda dari script sederhana hingga pattern production-ready.
+
+## Shebang dan Permission
+
+```bash
+#!/usr/bin/env bash
+# ↑ portable shebang: cari bash di PATH
+
+chmod +x deploy.sh
+./deploy.sh
+# atau
+bash deploy.sh
+```
+
+## Variabel
+
+```bash
+# Assignment: TIDAK ada spasi around =
+NAME="production"
+PORT=8080
+readonly API_KEY="secret"    # immutable
+
+# Akses
+echo "$NAME"
+echo "${NAME}_backup"        # disambiguate
+echo "${PORT:-3000}"         # default value
+echo "${NAME:?Variable required}"  # exit jika unset
+
+# Command substitution
+TODAY=$(date +%Y-%m-%d)
+FILES=$(ls *.log 2>/dev/null)
+UPTIME=$(uptime -p)
+
+# Environment
+export DATABASE_URL="postgres://localhost/mydb"
+echo "$HOME $USER $PATH"
+```
+
+## Control Flow
+
+```bash
+# if/elif/else
+if [[ -f /etc/nginx/nginx.conf ]]; then
+  echo "nginx config exists"
+elif [[ -d /etc/nginx ]]; then
+  echo "nginx dir exists but no config"
+else
+  echo "nginx not installed"
+fi
+
+# for loop
+for file in /var/log/*.log; do
+  echo "Processing: $file"
+  gzip "$file"
+done
+
+for i in {1..5}; do
+  echo "Iteration $i"
+done
+
+# while loop
+while read -r line; do
+  echo "Line: $line"
+done < /etc/passwd
+
+# until
+until ping -c 1 google.com &>/dev/null; do
+  echo "Waiting for network..."
+  sleep 2
+done
+
+# case
+case "$1" in
+  start)   systemctl start nginx ;;
+  stop)    systemctl stop nginx ;;
+  restart) systemctl restart nginx ;;
+  *)       echo "Usage: $0 {start|stop|restart}"; exit 1 ;;
+esac
+```
+
+## Fungsi
+
+```bash
+log() {
+  local level="$1"
+  shift
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] [$level] $*"
+}
+
+backup_dir() {
+  local src="$1"
+  local dest="$2"
+  local timestamp
+  timestamp=$(date +%Y%m%d_%H%M%S)
+
+  tar -czf "${dest}/backup_${timestamp}.tar.gz" "$src"
+  log "INFO" "Backup created: ${dest}/backup_${timestamp}.tar.gz"
+}
+
+backup_dir "/var/www" "/backup"
+```
+
+Keyword `local` penting. Tanpa itu, variabel di dalam fungsi bisa overwrite global.
+
+## Error Handling Production
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+#   e = exit on error
+#   u = error on undefined variable
+#   o pipefail = pipeline gagal jika salah satu command gagal
+
+IFS=$'\n\t'   # safer word splitting
+
+trap 'echo "Error on line $LINENO" >&2' ERR
+trap cleanup EXIT
+
+cleanup() {
+  rm -f /tmp/deploy.lock
+  log "INFO" "Cleanup done"
+}
+```
+
+## Argument Parsing
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<EOF
+Usage: $(basename "$0") [-e ENV] [-f] TARGET
+
+Options:
+  -e ENV    Environment (staging|production)
+  -f        Force deploy without confirmation
+  -h        Show this help
+
+Arguments:
+  TARGET    Deployment target directory
+EOF
+  exit 1
+}
+
+ENV="staging"
+FORCE=false
+
+while getopts "e:fh" opt; do
+  case $opt in
+    e) ENV="$OPTARG" ;;
+    f) FORCE=true ;;
+    h) usage ;;
+    *) usage ;;
+  esac
+done
+shift $((OPTIND - 1))
+
+TARGET="${1:?Target directory required}"
+
+echo "Deploying to $TARGET (env=$ENV, force=$FORCE)"
+```
+
+## Script Production: Health Check
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+
+readonly SERVICE="nginx"
+readonly URL="http://localhost/health"
+readonly MAX_RETRIES=3
+readonly RETRY_DELAY=5
+
+check_service() {
+  systemctl is-active --quiet "$SERVICE"
+}
+
+check_http() {
+  local status
+  status=$(curl -sf -o /dev/null -w '%{http_code}' "$URL")
+  [[ "$status" == "200" ]]
+}
+
+main() {
+  if ! check_service; then
+    echo "CRITICAL: $SERVICE is not running" >&2
+    exit 2
+  fi
+
+  for i in $(seq 1 $MAX_RETRIES); do
+    if check_http; then
+      echo "OK: Health check passed"
+      exit 0
+    fi
+    echo "WARN: Attempt $i/$MAX_RETRIES failed, retrying..."
+    sleep "$RETRY_DELAY"
+  done
+
+  echo "CRITICAL: Health check failed after $MAX_RETRIES attempts" >&2
+  exit 2
+}
+
+main "$@"
+```
+
+## Arrays dan Associative Arrays
+
+```bash
+# Indexed array
+SERVERS=("web1" "web2" "web3")
+echo "${SERVERS[0]}"
+echo "${#SERVERS[@]}"    # length
+
+for server in "${SERVERS[@]}"; do
+  echo "Deploying to $server"
+done
+
+# Associative array (Bash 4+)
+declare -A CONFIG
+CONFIG[host]="db.example.com"
+CONFIG[port]="5432"
+CONFIG[db]="myapp"
+
+echo "${CONFIG[host]}:${CONFIG[port]}"
+```
+
+## Debugging
+
+```bash
+bash -x script.sh          # trace execution
+bash -n script.sh          # syntax check only
+
+# In-script debug
+set -x    # enable trace
+# ... problematic section ...
+set +x    # disable trace
+```
+
+## Best Practice Checklist
+
+- Selalu gunakan `set -euo pipefail`
+- Quote variabel: `"$var"`, bukan `$var`
+- Gunakan `[[ ]]` bukan `[ ]` untuk test
+- Prefer `$()` over backticks
+- Gunakan `mktemp` untuk file sementara
+- Log ke stderr, output ke stdout
+- Validasi input sebelum eksekusi
+
+```bash
+TMPFILE=$(mktemp)
+trap 'rm -f "$TMPFILE"' EXIT
+```
+
+## Latihan Praktis
+
+1. Tulis script backup yang menerima direktori source dan destination sebagai argument
+2. Tambahkan argument parsing dengan `-v` (verbose) dan `-h` (help)
+3. Tulis health check script untuk service lokal dengan retry logic
+4. Jalankan dengan `shellcheck script.sh`, perbaiki semua warning
+
+## Rangkuman
+
+Bash scripting adalah force multiplier di Linux. Pattern `set -euo pipefail`, fungsi modular, dan argument parsing adalah standar di script production: backup, deploy, dan monitoring.

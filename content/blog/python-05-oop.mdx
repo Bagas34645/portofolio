@@ -1,0 +1,303 @@
+---
+title: "Python Tutorial (5): Object-Oriented Programming"
+description: "Class, instance, inheritance, polymorphism, dunder methods, property, dataclass, dan design pattern OOP Python."
+date: "2026-03-20"
+series: "Python"
+tags: ["Python", "Intermediate", "OOP", "Class"]
+---
+
+OOP di Python fleksibel dan pragmatis, bukan seperti Java yang memaksa semua hal dalam class. Gunakan OOP saat benar-benar memberi value: state management, abstraksi, dan polymorphism.
+
+## Class Dasar
+
+```python
+class User:
+    """Representasi user dalam sistem."""
+
+    def __init__(self, name, email):
+        self.name = name
+        self.email = email
+        self.active = True
+
+    def deactivate(self):
+        self.active = False
+
+    def __repr__(self):
+        return f"User(name={self.name!r}, email={self.email!r})"
+
+
+alice = User("Alice", "alice@mail.com")
+print(alice.name)        # Alice
+print(alice)             # User(name='Alice', email='alice@mail.com')
+alice.deactivate()
+```
+
+- `__init__`: constructor (initializer)
+- `self`: referensi ke instance saat ini (eksplisit, bukan implisit seperti `this`)
+- `__repr__`: representasi string untuk debugging
+
+## Class vs Instance Attributes
+
+```python
+class Dog:
+    species = "Canis lupus familiaris"    # class attribute (shared)
+
+    def __init__(self, name, breed):
+        self.name = name                  # instance attribute (per-object)
+        self.breed = breed
+
+
+rex = Dog("Rex", "German Shepherd")
+buddy = Dog("Buddy", "Golden Retriever")
+
+rex.species == buddy.species    # True, shared
+rex.name == buddy.name          # False, per-instance
+```
+
+## Inheritance
+
+```python
+class Animal:
+    def __init__(self, name, sound):
+        self.name = name
+        self.sound = sound
+
+    def speak(self):
+        return f"{self.name} says {self.sound}!"
+
+
+class Dog(Animal):
+    def __init__(self, name, breed):
+        super().__init__(name, sound="Woof")
+        self.breed = breed
+
+    def fetch(self, item):
+        return f"{self.name} fetches the {item}!"
+
+
+class Cat(Animal):
+    def __init__(self, name):
+        super().__init__(name, sound="Meow")
+
+
+rex = Dog("Rex", "Labrador")
+rex.speak()       # Rex says Woof!
+rex.fetch("ball") # Rex fetches the ball!
+```
+
+## Polymorphism
+
+```python
+def animal_chorus(animals):
+    for animal in animals:
+        print(animal.speak())
+
+animals = [Dog("Rex", "Lab"), Cat("Whiskers"), Dog("Buddy", "Poodle")]
+animal_chorus(animals)
+```
+
+Python polymorphism via duck typing, tidak butuh interface formal.
+
+## Dunder (Magic) Methods
+
+```python
+class Vector:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+
+    def __add__(self, other):
+        return Vector(self.x + other.x, self.y + other.y)
+
+    def __mul__(self, scalar):
+        return Vector(self.x * scalar, self.y * scalar)
+
+    def __abs__(self):
+        return (self.x**2 + self.y**2) ** 0.5
+
+    def __eq__(self, other):
+        return self.x == other.x and self.y == other.y
+
+    def __repr__(self):
+        return f"Vector({self.x}, {self.y})"
+
+    def __len__(self):
+        return 2
+
+    def __iter__(self):
+        yield self.x
+        yield self.y
+
+
+v1 = Vector(3, 4)
+v2 = Vector(1, 2)
+v3 = v1 + v2          # Vector(4, 6)
+abs(v1)               # 5.0
+x, y = v1             # unpacking via __iter__
+```
+
+| Method | Trigger |
+|--------|---------|
+| `__str__` | `str(obj)`, `print(obj)` |
+| `__repr__` | `repr(obj)`, REPL display |
+| `__len__` | `len(obj)` |
+| `__getitem__` | `obj[key]` |
+| `__contains__` | `item in obj` |
+| `__call__` | `obj()` |
+
+## Property: Controlled Access
+
+```python
+class Circle:
+    def __init__(self, radius):
+        self._radius = radius
+
+    @property
+    def radius(self):
+        return self._radius
+
+    @radius.setter
+    def radius(self, value):
+        if value < 0:
+            raise ValueError("Radius cannot be negative")
+        self._radius = value
+
+    @property
+    def area(self):
+        return 3.14159 * self._radius ** 2
+
+
+c = Circle(5)
+c.radius          # 5 (getter)
+c.radius = 10     # setter with validation
+c.area            # computed property
+```
+
+## @classmethod dan @staticmethod
+
+```python
+class Date:
+    def __init__(self, year, month, day):
+        self.year = year
+        self.month = month
+        self.day = day
+
+    @classmethod
+    def from_string(cls, date_str):
+        """Alternative constructor."""
+        year, month, day = map(int, date_str.split("-"))
+        return cls(year, month, day)
+
+    @staticmethod
+    def is_valid(date_str):
+        """Utility tidak butuh instance/class."""
+        parts = date_str.split("-")
+        return len(parts) == 3 and all(p.isdigit() for p in parts)
+
+
+d = Date.from_string("2026-03-20")
+Date.is_valid("2026-13-45")    # True (format check only)
+```
+
+## Dataclass (Python 3.7+)
+
+Menghilangkan boilerplate untuk class yang primarily menyimpan data:
+
+```python
+from dataclasses import dataclass, field
+
+
+@dataclass
+class Product:
+    name: str
+    price: float
+    quantity: int = 0
+    tags: list[str] = field(default_factory=list)
+
+    @property
+    def total_value(self):
+        return self.price * self.quantity
+
+
+p = Product("Laptop", 15_000_000, quantity=5)
+print(p)   # Product(name='Laptop', price=15000000, quantity=5, tags=[])
+
+# Auto-generated: __init__, __repr__, __eq__
+# Tambah frozen=True untuk immutable
+```
+
+```python
+@dataclass(frozen=True)
+class Point:
+    x: float
+    y: float
+
+# Immutable, bisa dipakai sebagai dict key atau set member
+```
+
+## Abstract Base Class
+
+```python
+from abc import ABC, abstractmethod
+
+
+class Shape(ABC):
+    @abstractmethod
+    def area(self) -> float:
+        pass
+
+    @abstractmethod
+    def perimeter(self) -> float:
+        pass
+
+
+class Rectangle(Shape):
+    def __init__(self, width, height):
+        self.width = width
+        self.height = height
+
+    def area(self):
+        return self.width * self.height
+
+    def perimeter(self):
+        return 2 * (self.width + self.height)
+
+
+# shape = Shape()      # TypeError: Can't instantiate abstract class
+rect = Rectangle(5, 3)
+rect.area()             # 15
+```
+
+## Composition over Inheritance
+
+```python
+class Engine:
+    def start(self):
+        return "Engine started"
+
+class GPS:
+    def navigate(self, destination):
+        return f"Navigating to {destination}"
+
+class Car:
+    def __init__(self):
+        self.engine = Engine()
+        self.gps = GPS()
+
+    def drive(self, destination):
+        self.engine.start()
+        return self.gps.navigate(destination)
+```
+
+Prefer composition saat hubungan "has-a" bukan "is-a".
+
+## Latihan Praktis
+
+1. Buat class `BankAccount` dengan deposit, withdraw, dan transfer antar akun
+2. Implementasi class `Stack` dengan dunder methods (`__len__`, `__iter__`, `__repr__`)
+3. Buat hierarki Shape → Circle, Rectangle, Triangle dengan abstract `area()`
+4. Konversi class model ke `@dataclass`, bandingkan jumlah baris kode
+
+## Rangkuman
+
+OOP Python pragmatis, gunakan saat memberi value, tidak demi OOP itu sendiri. Dataclass mengurangi boilerplate, composition lebih fleksibel dari deep inheritance, dan duck typing membuat interface implisit.

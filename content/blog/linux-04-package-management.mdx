@@ -1,0 +1,183 @@
+---
+title: "Linux Tutorial (4): Package Management: apt, dnf, dan Compiling from Source"
+description: "Install, update, dan remove software dengan apt/dnf, repository management, pinning, serta compile dari source code."
+date: "2026-01-15"
+series: "Linux"
+tags: ["Linux", "Intermediate", "Package Manager", "apt"]
+---
+
+Package manager adalah cara Linux mengelola software: dependency resolution, update keamanan, dan rollback. Di production, hampir semua software diinstall lewat package manager, bukan download manual.
+
+## Ekosistem Package Manager
+
+| Distro | Manager | Format |
+|--------|---------|--------|
+| Debian/Ubuntu | `apt` / `apt-get` | `.deb` |
+| Fedora/RHEL | `dnf` / `yum` | `.rpm` |
+| Arch | `pacman` | `.pkg.tar.zst` |
+
+Tutorial ini fokus **apt** (Debian/Ubuntu), konsepnya transferable ke dnf.
+
+## apt: Perintah Sehari-hari
+
+```bash
+# Update daftar paket (tidak install apapun)
+sudo apt update
+
+# Upgrade semua paket terinstall
+sudo apt upgrade
+
+# Full upgrade (bisa remove paket obsolete)
+sudo apt full-upgrade
+
+# Install paket
+sudo apt install nginx curl htop
+
+# Remove paket (keep config)
+sudo apt remove nginx
+
+# Purge paket + config
+sudo apt purge nginx
+
+# Hapus dependency orphan
+sudo apt autoremove
+
+# Cari paket
+apt search "web server"
+apt show nginx
+```
+
+## Repository Management
+
+File repository ada di `/etc/apt/sources.list` dan `/etc/apt/sources.list.d/`:
+
+```bash
+# Tambah PPA (Ubuntu)
+sudo add-apt-repository ppa:deadsnakes/ppa
+sudo apt update
+
+# Tambah repo third-party manual
+echo "deb [signed-by=/usr/share/keyrings/example.gpg] https://repo.example.com stable main" \
+  | sudo tee /etc/apt/sources.list.d/example.list
+
+# Import GPG key
+curl -fsSL https://repo.example.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/example.gpg
+```
+
+**Best practice production**: pin versi paket kritis, hindari PPA random di server.
+
+## apt Pinning: Kontrol Versi
+
+File `/etc/apt/preferences`:
+
+```text
+Package: nginx
+Pin: version 1.24.*
+Pin-Priority: 1001
+
+Package: *
+Pin: release o=Ubuntu
+Pin-Priority: 500
+```
+
+```bash
+# Hold paket: cegah auto-upgrade
+sudo apt-mark hold nginx
+sudo apt-mark unhold nginx
+sudo apt-mark showhold
+```
+
+## dpkg: Level Lebih Rendah
+
+```bash
+# Install .deb manual
+sudo dpkg -i package.deb
+
+# Fix broken dependency setelah dpkg -i gagal
+sudo apt --fix-broken install
+
+# List file dari paket terinstall
+dpkg -L nginx
+
+# Cari paket yang memiliki file
+dpkg -S /usr/bin/nginx
+
+# List semua paket terinstall
+dpkg -l | grep nginx
+```
+
+## dnf (Fedora/RHEL): Referensi Cepat
+
+```bash
+sudo dnf check-update
+sudo dnf install nginx
+sudo dnf remove nginx
+sudo dnf search nginx
+sudo dnf info nginx
+sudo dnf history                    # riwayat transaksi
+sudo dnf history undo last          # rollback
+```
+
+## Snap dan Flatpak
+
+```bash
+# Snap (Ubuntu)
+sudo snap install code --classic
+snap list
+sudo snap refresh
+
+# Flatpak
+flatpak install flathub org.gimp.GIMP
+flatpak update
+```
+
+Di server production, **hindari snap** untuk service kritis, startup lambat dan isolasi kadang mengganggu integrasi systemd.
+
+## Compile from Source
+
+Kadang paket tidak tersedia atau butuh patch custom:
+
+```bash
+# Install build dependencies
+sudo apt build-dep nginx   # dari source package
+sudo apt install build-essential autoconf libpcre3-dev zlib1g-dev
+
+# Download, configure, compile
+wget https://nginx.org/download/nginx-1.26.0.tar.gz
+tar -xzf nginx-1.26.0.tar.gz && cd nginx-1.26.0
+
+./configure \
+  --prefix=/usr/local/nginx \
+  --with-http_ssl_module \
+  --with-http_v2_module
+
+make -j$(nproc)
+sudo make install
+
+# Verifikasi
+/usr/local/nginx/sbin/nginx -v
+```
+
+**Catatan**: software dari source tidak terupdate otomatis oleh `apt upgrade`. Dokumentasikan versi dan langkah build.
+
+## Update Keamanan Otomatis
+
+```bash
+# Ubuntu: unattended-upgrades
+sudo apt install unattended-upgrades
+sudo dpkg-reconfigure unattended-upgrades
+
+# Cek log
+cat /var/log/unattended-upgrades/unattended-upgrades.log
+```
+
+## Latihan Praktis
+
+1. Install `nginx`, `htop`, `tree`, verifikasi dengan `which` dan `dpkg -L`
+2. Cari paket yang menyediakan `/usr/bin/zip` dengan `dpkg -S`
+3. Hold versi nginx saat ini, lalu coba `apt upgrade`, pastikan nginx tidak terupdate
+4. Remove nginx dengan `purge` dan `autoremove`
+
+## Rangkuman
+
+Package manager adalah fondasi operasional Linux. Kuasai `apt update/upgrade/install`, repository, dan pinning sebelum mengelola proses dan service di tutorial berikutnya.

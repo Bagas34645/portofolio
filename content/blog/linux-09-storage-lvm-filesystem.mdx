@@ -1,0 +1,233 @@
+---
+title: "Linux Tutorial (9): Storage Management: Partisi, LVM, dan Filesystem"
+description: "Partisi disk dengan fdisk/parted, Logical Volume Manager, filesystem ext4/XFS, mount options, dan recovery dasar."
+date: "2026-02-10"
+series: "Linux"
+tags: ["Linux", "Advanced", "LVM", "Storage", "Filesystem"]
+---
+
+Manajemen storage adalah skill kritis di server production: menambah kapasitas tanpa downtime, snapshot backup, dan recovery saat disk penuh. Tutorial ini membahas partisi, LVM, dan filesystem modern.
+
+## Identifikasi Disk
+
+```bash
+# List block devices
+lsblk
+lsblk -f              # + filesystem info
+
+# Detail hardware
+sudo fdisk -l
+sudo parted -l
+
+# By-id (persistent naming)
+ls -la /dev/disk/by-id/
+ls -la /dev/disk/by-uuid/
+```
+
+Naming convention:
+- `/dev/sda`: first SCSI/SATA disk
+- `/dev/sda1`: first partition on sda
+- `/dev/nvme0n1`: NVMe SSD
+- `/dev/nvme0n1p1`: first partition on NVMe
+
+## Partisi dengan fdisk
+
+```bash
+sudo fdisk /dev/sdb
+
+# Di dalam fdisk:
+# n → new partition
+# p → primary
+# 1 → partition number
+# Enter → default start
+# +10G → size
+# w → write and exit
+```
+
+```bash
+# Format partition
+sudo mkfs.ext4 /dev/sdb1
+# atau
+sudo mkfs.xfs /dev/sdb1
+
+# Mount
+sudo mkdir /data
+sudo mount /dev/sdb1 /data
+
+# Permanent via fstab
+UUID=$(blkid -s UUID -o value /dev/sdb1)
+echo "UUID=$UUID /data ext4 defaults 0 2" | sudo tee -a /etc/fstab
+sudo mount -a   # test fstab
+```
+
+## GPT dengan parted
+
+```bash
+sudo parted /dev/sdb --script mklabel gpt
+sudo parted /dev/sdb --script mkpart primary ext4 0% 100%
+sudo mkfs.ext4 /dev/sdb1
+```
+
+GPT mendukung disk > 2 TB dan lebih dari 4 partisi primary.
+
+## LVM: Logical Volume Manager
+
+LVM menambah lapisan abstraksi: **Physical Volume → Volume Group → Logical Volume**.
+
+```text
+/dev/sdb, /dev/sdc  →  PV (Physical Volume)
+        ↓
+    vg_data (Volume Group: pool storage)
+        ↓
+  lv_app, lv_logs (Logical Volume: "partisi virtual")
+        ↓
+  /dev/vg_data/lv_app  →  mount /app
+```
+
+### Setup LVM dari Nol
+
+```bash
+# 1. Buat Physical Volume
+sudo pvcreate /dev/sdb /dev/sdc
+
+# 2. Buat Volume Group
+sudo vgcreate vg_data /dev/sdb /dev/sdc
+
+# 3. Buat Logical Volume
+sudo lvcreate -L 50G -n lv_app vg_data
+sudo lvcreate -L 100G -n lv_logs vg_data
+
+# 4. Format dan mount
+sudo mkfs.ext4 /dev/vg_data/lv_app
+sudo mkdir /app
+sudo mount /dev/vg_data/lv_app /app
+```
+
+### Operasi LVM Sehari-hari
+
+```bash
+# Status overview
+sudo pvs && sudo vgs && sudo lvs
+
+# Extend LV (online, tanpa downtime!)
+sudo lvextend -L +20G /dev/vg_data/lv_app
+sudo resize2fs /dev/vg_data/lv_app        # ext4
+# sudo xfs_growfs /app                    # XFS (mount point)
+
+# Tambah disk ke VG
+sudo pvcreate /dev/sdd
+sudo vgextend vg_data /dev/sdd
+sudo lvextend -l +100%FREE /dev/vg_data/lv_logs
+sudo resize2fs /dev/vg_data/lv_logs
+
+# Snapshot (backup point-in-time)
+sudo lvcreate -L 5G -s -n lv_app_snap /dev/vg_data/lv_app
+sudo mount /dev/vg_data/lv_app_snap /mnt/snapshot -o ro
+# ... backup dari /mnt/snapshot ...
+sudo umount /mnt/snapshot
+sudo lvremove /dev/vg_data/lv_app_snap
+```
+
+## Filesystem: ext4 vs XFS
+
+| Fitur | ext4 | XFS |
+|-------|------|-----|
+| Default di | Debian/Ubuntu | RHEL/CentOS |
+| Max file size | 16 TB | 8 EB |
+| Online grow | Ya | Ya |
+| Online shrink | Tidak | Tidak |
+| Performance (large files) | Baik | Excellent |
+| Journaling | Ya | Ya |
+
+```bash
+# Tune ext4
+sudo tune2fs -l /dev/sda1          # info
+sudo tune2fs -m 1 /dev/sda1         # reserve 1% for root (default 5%)
+
+# Check & repair (unmount dulu!)
+sudo umount /data
+sudo fsck.ext4 -f /dev/sdb1
+sudo mount /data
+
+# XFS repair
+sudo xfs_repair /dev/sdb1
+```
+
+## Mount Options Penting
+
+```text
+# /etc/fstab
+UUID=xxx  /data  ext4  defaults,noatime,nodiratime  0  2
+UUID=yyy  /backup  xfs  defaults,nofail  0  0
+/dev/vg_data/lv_shared  /shared  ext4  defaults,nodev,nosuid  0  2
+```
+
+| Option | Efek |
+|--------|------|
+| `noatime` | Skip update access time: performance |
+| `nodiratime` | noatime untuk direktori saja |
+| `nofail` | Boot tetap jalan jika mount gagal |
+| `nodev` | Block device files |
+| `nosuid` | Block SUID/SGID |
+| `ro` | Read-only |
+
+## RAID Software (mdadm)
+
+```bash
+# Create RAID 1 (mirror)
+sudo mdadm --create /dev/md0 --level=1 --raid-devices=2 /dev/sdb /dev/sdc
+sudo mkfs.ext4 /dev/md0
+
+# Status
+cat /proc/mdstat
+sudo mdadm --detail /dev/md0
+
+# Persist config
+sudo mdadm --detail --scan | sudo tee -a /etc/mdadm/mdadm.conf
+sudo update-initramfs -u
+```
+
+## Disk Penuh: Emergency Response
+
+```bash
+# Cepat identifikasi
+df -h
+sudo du -xh / --max-depth=3 2>/dev/null | sort -rh | head -20
+
+# Temukan file besar
+sudo find / -xdev -type f -size +500M -exec ls -lh {} \; 2>/dev/null
+
+# Log rotation manual
+sudo journalctl --vacuum-size=500M
+sudo find /var/log -name "*.gz" -mtime +30 -delete
+
+# Clear apt cache
+sudo apt clean
+```
+
+## Swap Management
+
+```bash
+# LVM swap
+sudo lvcreate -L 4G -n lv_swap vg_data
+sudo mkswap /dev/vg_data/lv_swap
+sudo swapon /dev/vg_data/lv_swap
+echo '/dev/vg_data/lv_swap none swap sw 0 0' | sudo tee -a /etc/fstab
+
+# Swap file (alternatif)
+sudo fallocate -l 2G /swapfile
+sudo chmod 600 /swapfile
+sudo mkswap /swapfile
+sudo swapon /swapfile
+```
+
+## Latihan Praktis
+
+1. Buat partisi di disk virtual, format ext4, mount permanen via fstab
+2. Setup LVM dengan 2 "disk", buat LV, extend online tanpa unmount
+3. Buat LVM snapshot, mount read-only, verifikasi isinya
+4. Simulasi disk penuh: buat file besar, identifikasi dengan `du` dan `find`
+
+## Rangkuman
+
+LVM adalah standar di server production: extend volume online, snapshot backup, dan pool storage fleksibel. Kombinasikan dengan fstab options yang tepat dan emergency playbook saat disk penuh.

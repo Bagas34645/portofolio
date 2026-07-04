@@ -39,16 +39,23 @@ export default async function BlogDetailPage({ params }: Props) {
   const { meta, content } = post;
   const headings = extractHeadings(content);
 
+  const backHref = meta.series
+    ? `/blog/series/${meta.series.toLowerCase()}`
+    : "/blog";
+  const backLabel = meta.series
+    ? `Seri ${meta.series}`
+    : "Semua Kursus";
+
   return (
     <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
       <div className="lg:grid lg:grid-cols-[1fr_240px] lg:gap-12">
         <article className="mx-auto w-full max-w-3xl lg:mx-0">
           <Link
-            href="/blog"
+            href={backHref}
             className="link-underline inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground"
           >
             <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-            Semua artikel
+            {backLabel}
           </Link>
 
           <header className="mt-6">

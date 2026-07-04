@@ -1,0 +1,272 @@
+---
+title: "Python Tutorial (4): Fungsi dan Modul"
+description: "Definisi fungsi, parameter args/kwargs, lambda, scope, module/package system, dan best practice organisasi kode."
+date: "2026-03-15"
+series: "Python"
+tags: ["Python", "Fundamental", "Functions", "Modules"]
+---
+
+Fungsi adalah unit reusable kode, dan modul adalah cara Python mengorganisasi kode ke dalam file terpisah. Keduanya fundamental untuk menulis program yang maintainable.
+
+## Mendefinisikan Fungsi
+
+```python
+def greet(name):
+    """Sapa user dengan namanya."""
+    return f"Halo, {name}!"
+
+result = greet("Alice")
+print(result)   # Halo, Alice!
+```
+
+Fungsi tanpa `return` mengembalikan `None`.
+
+## Parameter dan Argument
+
+```python
+# Positional dan keyword arguments
+def create_user(name, age, active=True):
+    return {"name": name, "age": age, "active": active}
+
+create_user("Alice", 30)                  # positional
+create_user(name="Bob", age=25)           # keyword
+create_user("Charlie", age=28, active=False)
+
+# Default value: HATI-HATI dengan mutable default!
+def append_to(item, target=None):
+    if target is None:
+        target = []
+    target.append(item)
+    return target
+```
+
+### *args dan **kwargs
+
+```python
+# *args: positional arguments sebagai tuple
+def total(*numbers):
+    return sum(numbers)
+
+total(1, 2, 3, 4)   # 10
+
+# **kwargs: keyword arguments sebagai dict
+def build_query(**filters):
+    return " AND ".join(f"{k}='{v}'" for k, v in filters.items())
+
+build_query(name="Alice", city="Jakarta")
+# "name='Alice' AND city='Jakarta'"
+
+# Kombinasi
+def api_call(endpoint, *args, method="GET", **kwargs):
+    print(f"{method} {endpoint}")
+    print(f"Args: {args}")
+    print(f"Kwargs: {kwargs}")
+```
+
+### Keyword-only dan Positional-only
+
+```python
+# Keyword-only (setelah *)
+def connect(host, port, *, timeout=30, retries=3):
+    pass
+
+connect("localhost", 5432, timeout=10)   # OK
+connect("localhost", 5432, 10)           # Error!
+
+# Positional-only (sebelum /), Python 3.8+
+def pow(base, exp, /):
+    return base ** exp
+
+pow(2, 10)       # OK
+pow(base=2, exp=10)  # Error!
+```
+
+## Return Values
+
+```python
+# Multiple return (tuple unpacking)
+def divmod_custom(a, b):
+    return a // b, a % b
+
+quotient, remainder = divmod_custom(17, 5)
+
+# Early return
+def find_first(items, predicate):
+    for item in items:
+        if predicate(item):
+            return item
+    return None
+```
+
+## Lambda: Fungsi Anonim
+
+```python
+# Lambda: ekspresi satu baris
+square = lambda x: x ** 2
+add = lambda a, b: a + b
+
+# Berguna sebagai argument
+names = ["Charlie", "Alice", "Bob"]
+sorted(names, key=lambda n: len(n))
+
+# Map & filter
+numbers = [1, 2, 3, 4, 5]
+doubled = list(map(lambda x: x * 2, numbers))
+evens = list(filter(lambda x: x % 2 == 0, numbers))
+```
+
+Prefer list comprehension over map/filter untuk readability.
+
+## Scope: LEGB Rule
+
+```python
+x = "global"
+
+def outer():
+    x = "enclosing"
+
+    def inner():
+        x = "local"
+        print(x)    # local
+
+    inner()
+    print(x)        # enclosing
+
+outer()
+print(x)            # global
+```
+
+**LEGB**: Local → Enclosing → Global → Built-in
+
+```python
+# nonlocal: akses variabel enclosing scope
+def counter():
+    count = 0
+    def increment():
+        nonlocal count
+        count += 1
+        return count
+    return increment
+
+c = counter()
+c()   # 1
+c()   # 2
+
+# global: akses variabel global (hindari jika mungkin)
+total = 0
+def add_to_total(n):
+    global total
+    total += n
+```
+
+## Type Hints (Preview)
+
+```python
+def greet(name: str, times: int = 1) -> str:
+    return (f"Hello, {name}! " * times).strip()
+
+def process(items: list[int]) -> dict[str, int]:
+    return {"sum": sum(items), "count": len(items)}
+```
+
+Type hints tidak di-enforce runtime, dibahas mendalam di tutorial 11.
+
+## Modul dan Import
+
+Setiap file `.py` adalah modul. Folder dengan `__init__.py` adalah package.
+
+```python
+# math_utils.py
+def add(a, b):
+    return a + b
+
+def multiply(a, b):
+    return a * b
+
+PI = 3.14159
+```
+
+```python
+# main.py
+import math_utils
+math_utils.add(2, 3)
+
+from math_utils import add, PI
+add(2, 3)
+
+from math_utils import *     # hindari, namespace pollution
+import math_utils as mu      # alias
+mu.multiply(3, 4)
+```
+
+## Package Structure
+
+```text
+myproject/
+├── main.py
+├── utils/
+│   ├── __init__.py
+│   ├── strings.py
+│   └── numbers.py
+└── models/
+    ├── __init__.py
+    └── user.py
+```
+
+```python
+# main.py
+from utils.strings import capitalize
+from models.user import User
+
+# utils/__init__.py: expose public API
+from .strings import capitalize
+from .numbers import round_up
+```
+
+## Standard Library Highlights
+
+```python
+import os
+os.getcwd()
+os.listdir(".")
+os.path.join("dir", "file.txt")
+
+import sys
+sys.argv           # command line arguments
+sys.exit(1)
+
+import json
+data = json.loads('{"name": "Alice"}')
+json.dumps(data, indent=2)
+
+import datetime
+now = datetime.datetime.now()
+today = datetime.date.today()
+
+from pathlib import Path
+p = Path("data") / "output.csv"
+p.exists()
+p.read_text()
+p.write_text("hello")
+
+import random
+random.randint(1, 100)
+random.choice(["a", "b", "c"])
+random.shuffle(items)
+
+from collections import Counter, defaultdict
+Counter("hello")           # Counter({'l': 2, 'h': 1, ...})
+d = defaultdict(list)
+d["key"].append("value")   # no KeyError
+```
+
+## Latihan Praktis
+
+1. Tulis fungsi `fibonacci(n)` yang mengembalikan list n bilangan Fibonacci
+2. Buat fungsi `retry(func, max_attempts=3)` yang memanggil fungsi dan retry jika error
+3. Organisasi kode calculator ke dalam package: `calc/add.py`, `calc/subtract.py`, dll.
+4. Gunakan `pathlib` untuk list semua file `.py` di direktori secara recursive
+
+## Rangkuman
+
+Fungsi + modul = fondasi organisasi kode Python. Kuasai `*args/**kwargs`, scope LEGB, dan package structure sebelum masuk ke OOP di tutorial berikutnya.

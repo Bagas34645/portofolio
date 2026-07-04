@@ -25,6 +25,7 @@ export type PostMeta = {
   description: string;
   date: string;
   tags: string[];
+  series: string;
   readingTime: string;
 };
 
@@ -76,6 +77,7 @@ export function getPosts(): PostMeta[] {
       description: data.description as string,
       date: data.date as string,
       tags: (data.tags as string[]) ?? [],
+      series: (data.series as string) ?? "",
       readingTime: `${Math.max(1, Math.ceil(readingTime(content).minutes))} menit baca`,
     }))
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
@@ -93,10 +95,70 @@ export function getPost(slug: string) {
       description: data.description as string,
       date: data.date as string,
       tags: (data.tags as string[]) ?? [],
+      series: (data.series as string) ?? "",
       readingTime: `${Math.max(1, Math.ceil(readingTime(content).minutes))} menit baca`,
     } satisfies PostMeta,
     content,
   };
+}
+
+export type SeriesMeta = {
+  slug: string;
+  title: string;
+  description: string;
+  totalPosts: number;
+  totalReadingMinutes: number;
+  levels: string[];
+};
+
+const SERIES_INFO: Record<string, { title: string; description: string }> = {
+  Linux: {
+    title: "Linux",
+    description:
+      "Dari terminal dasar hingga Docker & production troubleshooting | kuasai sistem operasi yang menjalankan internet.",
+  },
+  Python: {
+    title: "Python",
+    description:
+      "Dari variabel hingga machine learning | 18 bab mencakup fundamental, OOP, database, data science (NumPy/Pandas/Matplotlib), ML dengan scikit-learn, testing, dan deployment production.",
+  },
+};
+
+export function getPostsBySeries(series: string): PostMeta[] {
+  return getPosts()
+    .filter((p) => p.series.toLowerCase() === series.toLowerCase())
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+}
+
+export function getSeries(): SeriesMeta[] {
+  const posts = getPosts();
+  const seriesNames = [...new Set(posts.map((p) => p.series).filter(Boolean))];
+
+  return seriesNames.map((name) => {
+    const seriesPosts = posts.filter((p) => p.series === name);
+    const totalMinutes = seriesPosts.reduce(
+      (sum, p) => sum + parseInt(p.readingTime),
+      0,
+    );
+    const levels = [
+      ...new Set(
+        seriesPosts.flatMap((p) =>
+          p.tags.filter((t) =>
+            ["Fundamental", "Intermediate", "Advanced", "Expert"].includes(t),
+          ),
+        ),
+      ),
+    ];
+    const info = SERIES_INFO[name] ?? { title: name, description: "" };
+    return {
+      slug: name.toLowerCase(),
+      title: info.title,
+      description: info.description,
+      totalPosts: seriesPosts.length,
+      totalReadingMinutes: totalMinutes,
+      levels,
+    };
+  });
 }
 
 export type TocHeading = {

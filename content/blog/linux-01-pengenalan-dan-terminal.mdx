@@ -1,0 +1,132 @@
+---
+title: "Linux Tutorial (1): Pengenalan Linux dan Dasar Terminal"
+description: "Memahami apa itu Linux, distribusi populer, struktur direktori FHS, dan perintah terminal esensial untuk pemula."
+date: "2026-01-01"
+series: "Linux"
+tags: ["Linux", "Fundamental", "Terminal", "CLI"]
+---
+
+Linux adalah kernel open-source yang menjadi fondasi sistem operasi server, cloud, embedded device, hingga Android. Tutorial ini membuka seri pembelajaran Linux, dari nol hingga level production.
+
+## Apa itu Linux?
+
+Linux bukan "satu sistem operasi", melainkan **kernel** yang dikelola oleh komunitas global. Distribusi (distro) seperti Ubuntu, Debian, Fedora, dan Arch Linux membungkus kernel tersebut dengan package manager, desktop environment, dan konfigurasi default masing-masing.
+
+| Distro | Cocok untuk | Package Manager |
+|--------|-------------|-----------------|
+| Ubuntu / Debian | Server & pemula | `apt` |
+| Fedora / RHEL | Enterprise | `dnf` / `yum` |
+| Arch Linux | Power user | `pacman` |
+
+Untuk belajar, **Ubuntu Server** atau **Debian** adalah pilihan paling ramah, dokumentasi luas dan komunitas besar.
+
+## Mengapa Belajar Linux?
+
+- **Server & cloud**: mayoritas VPS, container, dan Kubernetes node berjalan di Linux
+- **DevOps & SRE**: deployment, monitoring, dan automation hampir selalu melibatkan shell Linux
+- **Keamanan & kontrol**: Anda memegang kendali penuh atas sistem, tidak seperti OS desktop tertutup
+
+## Membuka Terminal
+
+Terminal (atau shell) adalah antarmuka teks untuk berinteraksi dengan OS. Shell default modern adalah **Bash** (`/bin/bash`), meskipun **Zsh** dan **Fish** juga populer.
+
+```bash
+# Cek shell yang sedang aktif
+echo $SHELL
+
+# Cek versi kernel
+uname -r
+
+# Info distro (Debian/Ubuntu)
+cat /etc/os-release
+```
+
+## Struktur Direktori FHS
+
+Linux mengikuti **Filesystem Hierarchy Standard (FHS)**, layout direktori konsisten di semua distro:
+
+```text
+/           → root dari seluruh filesystem
+/bin        → binary esensial (ls, cp, mv)
+/etc        → file konfigurasi sistem
+/home       → home directory setiap user
+/var        → data variabel (log, cache, database)
+/tmp        → file sementara
+/usr        → program user-space
+/opt        → software pihak ketiga
+/proc       → pseudo-filesystem info proses (virtual)
+/sys        → pseudo-filesystem info hardware (virtual)
+```
+
+## Perintah Navigasi Dasar
+
+```bash
+# Tampilkan direktori kerja saat ini
+pwd
+
+# Pindah direktori
+cd /home
+cd ..          # naik satu level
+cd ~           # ke home directory
+
+# List isi direktori
+ls             # ringkas
+ls -la         # detail + file tersembunyi
+ls -lh         # ukuran human-readable
+
+# Buat & hapus direktori
+mkdir proyek-baru
+mkdir -p src/lib/utils   # buat nested sekaligus
+rmdir proyek-baru        # hanya direktori kosong
+```
+
+## Perintah File Dasar
+
+```bash
+# Salin, pindah, rename
+cp file.txt backup.txt
+cp -r folder/ folder-backup/
+mv file.txt dokumen.txt   # rename
+mv file.txt ~/Downloads/  # pindah
+
+# Baca isi file
+cat file.txt              # seluruh isi
+head -n 20 file.txt       # 20 baris pertama
+tail -n 50 /var/log/syslog  # 50 baris terakhir
+less file.txt             # pager interaktif (q untuk keluar)
+
+# Buat file kosong
+touch catatan.txt
+```
+
+## Bantuan dan Dokumentasi
+
+Kebiasaan terpenting di Linux: **baca manual sebelum menebak**.
+
+```bash
+man ls          # manual page untuk ls
+ls --help       # bantuan singkat
+apropos "copy file"   # cari perintah berdasarkan keyword
+```
+
+## Shortcut Terminal Penting
+
+| Shortcut | Fungsi |
+|----------|--------|
+| `Ctrl + C` | Hentikan proses yang sedang berjalan |
+| `Ctrl + D` | EOF / keluar dari shell |
+| `Ctrl + L` | Clear layar |
+| `Ctrl + R` | Reverse search history |
+| `Tab` | Autocomplete perintah/path |
+| `↑` / `↓` | Navigasi command history |
+
+## Latihan Praktis
+
+1. Buka terminal dan jalankan `pwd`, `ls -la`, `uname -a`
+2. Buat struktur direktori: `mkdir -p ~/belajar-linux/{docs,scripts,logs}`
+3. Buat file `~/belajar-linux/docs/catatan.txt` dengan `touch`, lalu baca isinya dengan `cat`
+4. Coba `man mkdir` dan baca opsi `-p`, apa fungsinya?
+
+## Rangkuman
+
+Anda sudah memahami posisi Linux di ekosistem IT, layout direktori FHS, dan perintah terminal dasar. Di tutorial berikutnya kita akan masuk lebih dalam ke **manajemen file system**: symlink, find, tar, dan compress.

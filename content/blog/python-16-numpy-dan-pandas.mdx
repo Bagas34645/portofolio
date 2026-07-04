@@ -1,0 +1,272 @@
+---
+title: "Python Tutorial (16): NumPy dan Pandas untuk Data Science"
+description: "Array numerik dengan NumPy, DataFrame Pandas, indexing, filtering, groupby, merge, dan analisis data tabular."
+date: "2026-05-15"
+series: "Python"
+tags: ["Python", "Advanced", "NumPy", "Pandas", "Data Science"]
+---
+
+Data science dimulai dari manipulasi data numerik dan tabular. **NumPy** menyediakan array multidimensi yang cepat; **Pandas** menambahkan struktur DataFrame untuk data seperti spreadsheet/SQL table. Keduanya fondasi ekosistem Python data.
+
+## Instalasi
+
+```bash
+pip install numpy pandas
+```
+
+## NumPy: Array Numerik
+
+```python
+import numpy as np
+
+# Buat array
+arr = np.array([1, 2, 3, 4, 5])
+zeros = np.zeros((3, 4))          # matrix 3x4 nol
+ones = np.ones((2, 3))
+range_arr = np.arange(0, 10, 2)   # [0, 2, 4, 6, 8]
+linspace = np.linspace(0, 1, 5)   # 5 titik antara 0 dan 1
+
+# Shape dan dtype
+arr.shape      # (5,)
+arr.dtype      # dtype('int64')
+arr.reshape(5, 1)
+```
+
+### Operasi Vectorized
+
+Keunggulan NumPy: operasi tanpa loop Python (jauh lebih cepat):
+
+```python
+import numpy as np
+
+a = np.array([1, 2, 3, 4])
+b = np.array([10, 20, 30, 40])
+
+a + b          # [11, 22, 33, 44]
+a * 2          # [2, 4, 6, 8]
+a ** 2         # [1, 4, 9, 16]
+np.sqrt(a)     # [1., 1.414, 1.732, 2.]
+
+# Statistik
+np.mean(a)     # 2.5
+np.std(a)      # standard deviation
+np.sum(a)      # 10
+np.max(a)      # 4
+np.argmax(a)   # index of max: 3
+```
+
+### Indexing dan Slicing
+
+```python
+import numpy as np
+
+matrix = np.array([
+    [1, 2, 3],
+    [4, 5, 6],
+    [7, 8, 9],
+])
+
+matrix[0, 1]       # 2
+matrix[:, 0]       # kolom pertama: [1, 4, 7]
+matrix[1, :]       # baris kedua: [4, 5, 6]
+matrix[matrix > 5] # [6, 7, 8, 9] (boolean indexing)
+```
+
+### Broadcasting
+
+```python
+import numpy as np
+
+matrix = np.array([[1, 2, 3], [4, 5, 6]])
+matrix + 10      # tambah 10 ke semua elemen
+matrix * np.array([1, 2, 3])  # multiply per kolom
+```
+
+## Pandas: DataFrame
+
+```python
+import pandas as pd
+
+# Dari dictionary
+df = pd.DataFrame({
+    "name": ["Alice", "Bob", "Charlie", "Diana"],
+    "age": [30, 25, 35, 28],
+    "city": ["Jakarta", "Bandung", "Jakarta", "Surabaya"],
+    "salary": [15000000, 12000000, 18000000, 14000000],
+})
+
+print(df.head())
+print(df.info())
+print(df.describe())
+```
+
+### Membaca dan Menulis Data
+
+```python
+import pandas as pd
+
+# CSV
+df = pd.read_csv("data.csv")
+df.to_csv("output.csv", index=False)
+
+# Excel
+df = pd.read_excel("data.xlsx", sheet_name="Sheet1")
+
+# JSON
+df = pd.read_json("data.json")
+df.to_json("output.json", orient="records")
+```
+
+### Seleksi dan Filtering
+
+```python
+import pandas as pd
+
+# Kolom
+df["name"]
+df[["name", "salary"]]
+
+# Baris by index
+df.iloc[0]          # baris pertama
+df.iloc[0:3]        # baris 0-2
+df.loc[0, "name"]   # label-based
+
+# Filter kondisional
+df[df["age"] > 28]
+df[(df["city"] == "Jakarta") & (df["salary"] > 14000000)]
+df[df["name"].str.startswith("A")]
+```
+
+### Operasi DataFrame
+
+```python
+import pandas as pd
+
+# Kolom baru
+df["salary_m"] = df["salary"] / 1_000_000
+df["is_senior"] = df["age"] >= 30
+
+# Sort
+df.sort_values("salary", ascending=False)
+
+# Missing values
+df.isnull().sum()
+df.dropna()
+df.fillna(0)
+
+# Apply
+df["name_upper"] = df["name"].apply(str.upper)
+```
+
+### GroupBy: Aggregasi
+
+```python
+import pandas as pd
+
+# Rata-rata gaji per kota
+df.groupby("city")["salary"].mean()
+
+# Multiple aggregations
+df.groupby("city").agg({
+    "salary": ["mean", "min", "max"],
+    "age": "mean",
+})
+
+# Count per group
+df.groupby("city").size()
+```
+
+### Merge dan Join
+
+```python
+import pandas as pd
+
+orders = pd.DataFrame({
+    "order_id": [1, 2, 3],
+    "user_id": [101, 102, 101],
+    "amount": [500, 300, 700],
+})
+
+users = pd.DataFrame({
+    "user_id": [101, 102, 103],
+    "name": ["Alice", "Bob", "Charlie"],
+})
+
+# SQL-like join
+merged = pd.merge(orders, users, on="user_id", how="left")
+# order_id | user_id | amount | name
+```
+
+### Pivot Table
+
+```python
+import pandas as pd
+
+sales = pd.DataFrame({
+    "region": ["East", "West", "East", "West"],
+    "product": ["A", "A", "B", "B"],
+    "revenue": [100, 150, 200, 180],
+})
+
+pivot = sales.pivot_table(
+    values="revenue",
+    index="region",
+    columns="product",
+    aggfunc="sum",
+)
+```
+
+## NumPy + Pandas Integration
+
+```python
+import pandas as pd
+import numpy as np
+
+df = pd.DataFrame({"values": [1, 2, 3, 4, 5]})
+
+# Akses sebagai NumPy array
+arr = df["values"].to_numpy()
+normalized = (arr - arr.mean()) / arr.std()
+
+df["normalized"] = normalized
+```
+
+## Contoh End-to-End: Analisis CSV
+
+```python
+import pandas as pd
+
+df = pd.read_csv("sales.csv", parse_dates=["date"])
+
+# Filter Q1 2026
+q1 = df[(df["date"] >= "2026-01-01") & (df["date"] < "2026-04-01")]
+
+# Top 5 produk by revenue
+top_products = (
+    q1.groupby("product")["revenue"]
+    .sum()
+    .sort_values(ascending=False)
+    .head(5)
+)
+
+print(top_products)
+
+# Export summary
+summary = q1.groupby("region").agg(
+    total_revenue=("revenue", "sum"),
+    avg_order=("revenue", "mean"),
+    order_count=("order_id", "count"),
+)
+summary.to_csv("q1_summary.csv")
+```
+
+## Latihan Praktis
+
+1. Buat DataFrame 100 baris data penjualan sintetis dengan `numpy.random`
+2. Hitung total revenue per bulan dari kolom tanggal
+3. Temukan outlier gaji (di luar 1.5 × IQR) dengan Pandas
+4. Merge dua dataset (users + orders) dan hitung total spend per user
+
+## Rangkuman
+
+NumPy untuk komputasi numerik vectorized; Pandas untuk data tabular dengan API mirip SQL/spreadsheet. Kombinasi keduanya adalah fondasi data science Python. Selanjutnya: **visualisasi data dengan Matplotlib**.

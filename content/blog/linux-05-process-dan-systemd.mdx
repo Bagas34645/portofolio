@@ -1,0 +1,243 @@
+---
+title: "Linux Tutorial (5): Process Management dan systemd"
+description: "Monitor proses dengan ps/top/htop, sinyal kill, job control, serta mengelola service dengan systemctl dan journalctl."
+date: "2026-01-20"
+series: "Linux"
+tags: ["Linux", "Intermediate", "Process", "systemd"]
+---
+
+Setiap program yang berjalan di Linux adalah **proses**, instance program dengan PID unik, memory space sendiri, dan lifecycle yang dikelola kernel. Di server modern, **systemd** mengontrol hampir semua service.
+
+## Anatomi Proses
+
+```bash
+# Proses saat ini
+echo $$                    # PID shell ini
+ps -p $$                   # detail proses shell
+
+# Semua proses (BSD style)
+ps aux
+
+# Tree view: lihat parent-child
+ps auxf
+pstree -p
+
+# Filter
+ps aux | grep nginx
+pgrep -a nginx             # PID + command line
+pidof nginx
+```
+
+Kolom penting `ps aux`:
+- **USER**: owner proses
+- **PID**: Process ID
+- **%CPU / %MEM**: resource usage
+- **STAT**: state (R=running, S=sleeping, Z=zombie, D=uninterruptible)
+- **START / TIME**: kapan mulai, total CPU time
+
+## Monitoring Real-time
+
+```bash
+# top: interactive (q=quit, M=sort memory, P=sort CPU, k=kill)
+top
+
+# htop: lebih user-friendly
+htop
+
+# Snapshot sekali
+top -bn1 | head -20
+
+# Monitor proses spesifik
+top -p $(pidof nginx)
+```
+
+## Sinyal dan kill
+
+```bash
+# Graceful stop (SIGTERM = 15)
+kill 1234
+kill -15 1234
+
+# Force kill (SIGKILL = 9): tidak bisa ditangkap/diabaikan
+kill -9 1234
+
+# Kill by name
+killall nginx
+pkill -f "python app.py"
+
+# Daftar sinyal
+kill -l
+```
+
+| Sinyal | Nomor | Gunakan saat |
+|--------|-------|--------------|
+| SIGTERM | 15 | Stop normal, proses bisa cleanup |
+| SIGKILL | 9 | Proses hang/zombie, last resort |
+| SIGHUP | 1 | Reload config (nginx, syslog) |
+| SIGSTOP | 19 | Pause proses |
+| SIGCONT | 18 | Lanjutkan proses paused |
+
+**Aturan**: selalu coba SIGTERM dulu, tunggu 5–10 detik, baru SIGKILL.
+
+## Job Control
+
+```bash
+# Jalankan di background
+sleep 300 &
+jobs
+
+# Suspend proses foreground
+# Ctrl + Z
+
+# Lanjutkan di background
+bg %1
+
+# Bawa ke foreground
+fg %1
+
+# nohup: proses tetap jalan setelah logout
+nohup ./long-running.sh > output.log 2>&1 &
+disown
+```
+
+## Prioritas: nice dan renice
+
+```bash
+# Jalankan dengan prioritas rendah (nice 19 = paling rendah)
+nice -n 19 ./backup.sh
+
+# Ubah prioritas proses yang sudah berjalan
+sudo renice -n -5 -p 1234   # lebih tinggi (butuh root untuk negative nice)
+```
+
+Range nice: **-20** (prioritas tertinggi) hingga **19** (terendah). Default: 0.
+
+## systemd: Unit Files
+
+systemd mengelola **units**: service, mount, timer, socket, dll.
+
+```bash
+# Status service
+systemctl status nginx
+
+# Start / stop / restart / reload
+sudo systemctl start nginx
+sudo systemctl stop nginx
+sudo systemctl restart nginx
+sudo systemctl reload nginx
+
+# Enable / disable saat boot
+sudo systemctl enable nginx
+sudo systemctl disable nginx
+sudo systemctl is-enabled nginx
+
+# List semua service
+systemctl list-units --type=service
+systemctl list-unit-files --type=service
+```
+
+## Menulis Service Unit Custom
+
+File: `/etc/systemd/system/myapp.service`
+
+```ini
+[Unit]
+Description=My Application Server
+After=network.target postgresql.service
+Requires=postgresql.service
+
+[Service]
+Type=simple
+User=appuser
+Group=appuser
+WorkingDirectory=/opt/myapp
+ExecStart=/opt/myapp/bin/server --port 8080
+Restart=on-failure
+RestartSec=5
+Environment=NODE_ENV=production
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now myapp.service
+systemctl status myapp.service
+```
+
+## journalctl: Log systemd
+
+```bash
+# Log service spesifik
+journalctl -u nginx
+
+# Follow real-time
+journalctl -u nginx -f
+
+# Sejak boot terakhir
+journalctl -b
+
+# Rentang waktu
+journalctl --since "2026-01-20 08:00" --until "2026-01-20 12:00"
+journalctl -u myapp --since "1 hour ago"
+
+# Prioritas error ke atas
+journalctl -p err -b
+
+# Export
+journalctl -u nginx --since today > nginx-today.log
+```
+
+## Timer: Cron Modern
+
+```ini
+# /etc/systemd/system/backup.timer
+[Unit]
+Description=Daily Backup Timer
+
+[Timer]
+OnCalendar=daily
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+```
+
+```ini
+# /etc/systemd/system/backup.service
+[Unit]
+Description=Daily Backup
+
+[Service]
+Type=oneshot
+ExecStart=/opt/scripts/backup.sh
+```
+
+```bash
+sudo systemctl enable --now backup.timer
+systemctl list-timers
+```
+
+## Zombie Process
+
+Zombie (STAT=Z) = proses sudah mati tapi entry masih di process table karena parent belum `wait()`.
+
+```bash
+# Identifikasi
+ps aux | awk '$8 ~ /Z/ {print}'
+
+# Fix: restart parent process, atau kill parent (zombie di-adopt init)
+```
+
+## Latihan Praktis
+
+1. Jalankan `sleep 600 &`, monitor dengan `jobs`, hentikan dengan `kill`
+2. Buat systemd service untuk script bash sederhana, enable saat boot
+3. Simulasi crash: buat service dengan `ExecStart=/bin/false`, set `Restart=on-failure`, amati journalctl
+4. Buat systemd timer untuk menjalankan script setiap 5 menit
+
+## Rangkuman
+
+Process management dan systemd adalah skill inti sysadmin. Kuasai `ps`, sinyal, job control, `systemctl`, dan `journalctl`, alat ini dipakai setiap hari di production.

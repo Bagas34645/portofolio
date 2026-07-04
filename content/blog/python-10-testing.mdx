@@ -1,0 +1,339 @@
+---
+title: "Python Tutorial (10): Testing dengan pytest"
+description: "Unit test, fixture, parametrize, mocking, coverage, TDD workflow, dan strategi testing untuk project production."
+date: "2026-04-15"
+series: "Python"
+tags: ["Python", "Advanced", "Testing", "pytest", "TDD"]
+---
+
+Testing bukan afterthought, ini investasi yang menghemat waktu debugging dan mencegah regresi. pytest adalah framework testing de facto Python: simple, powerful, dan extensible.
+
+## Mengapa pytest?
+
+- Syntax assert biasa (bukan `self.assertEqual`)
+- Auto-discovery test files dan functions
+- Fixture system yang powerful
+- Plugin ecosystem (coverage, asyncio, django, dll.)
+- Output error yang informatif
+
+## Test Pertama
+
+```python
+# tests/test_math.py
+def add(a, b):
+    return a + b
+
+def test_add_positive():
+    assert add(2, 3) == 5
+
+def test_add_negative():
+    assert add(-1, 1) == 0
+
+def test_add_float():
+    assert add(0.1, 0.2) == pytest.approx(0.3)
+```
+
+```bash
+# Run
+pytest                      # discover & run all
+pytest tests/test_math.py   # specific file
+pytest -v                   # verbose
+pytest -k "test_add"        # filter by name
+```
+
+## Project Structure
+
+```text
+myproject/
+├── src/
+│   └── myproject/
+│       ├── __init__.py
+│       ├── users.py
+│       └── database.py
+├── tests/
+│   ├── conftest.py          # shared fixtures
+│   ├── test_users.py
+│   └── test_database.py
+├── pyproject.toml
+└── pytest.ini / pyproject.toml [tool.pytest]
+```
+
+```toml
+# pyproject.toml
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-v --tb=short"
+```
+
+## Fixture: Setup & Teardown
+
+```python
+import pytest
+
+@pytest.fixture
+def sample_user():
+    return {"name": "Alice", "email": "alice@test.com", "age": 30}
+
+@pytest.fixture
+def database():
+    db = create_test_database()
+    yield db                    # test runs here
+    db.cleanup()                # teardown after test
+
+def test_user_creation(sample_user, database):
+    user = database.create_user(**sample_user)
+    assert user.name == "Alice"
+    assert user.email == "alice@test.com"
+```
+
+### Fixture Scopes
+
+```python
+@pytest.fixture(scope="function")   # default: per-test
+@pytest.fixture(scope="class")      # per-class
+@pytest.fixture(scope="module")     # per-file
+@pytest.fixture(scope="session")    # per-run
+
+@pytest.fixture(scope="session")
+def app():
+    """Buat app sekali untuk seluruh test session."""
+    app = create_app(testing=True)
+    yield app
+    app.shutdown()
+```
+
+### conftest.py: Shared Fixtures
+
+```python
+# tests/conftest.py: available to ALL tests in directory
+import pytest
+
+@pytest.fixture
+def api_client(app):
+    return app.test_client()
+
+@pytest.fixture
+def auth_headers():
+    return {"Authorization": "Bearer test-token"}
+```
+
+## Parametrize: Multiple Test Cases
+
+```python
+import pytest
+
+@pytest.mark.parametrize("input,expected", [
+    ("hello", 5),
+    ("", 0),
+    ("Python", 6),
+    ("  spaces  ", 10),
+])
+def test_string_length(input, expected):
+    assert len(input) == expected
+
+
+@pytest.mark.parametrize("a,b,result", [
+    (1, 2, 3),
+    (-1, 1, 0),
+    (0, 0, 0),
+    (100, -50, 50),
+])
+def test_add(a, b, result):
+    assert add(a, b) == result
+```
+
+## Testing Exceptions
+
+```python
+import pytest
+
+def divide(a, b):
+    if b == 0:
+        raise ValueError("Cannot divide by zero")
+    return a / b
+
+def test_divide_by_zero():
+    with pytest.raises(ValueError, match="Cannot divide by zero"):
+        divide(10, 0)
+
+def test_divide_type_error():
+    with pytest.raises(TypeError):
+        divide("a", 2)
+```
+
+## Mocking
+
+```python
+from unittest.mock import Mock, patch, MagicMock
+
+# Mock object
+mock_db = Mock()
+mock_db.get_user.return_value = {"name": "Alice"}
+mock_db.get_user("alice")    # {"name": "Alice"}
+mock_db.get_user.assert_called_once_with("alice")
+
+
+# patch: replace real object in tests
+def test_send_email():
+    with patch("myproject.email.smtp_client") as mock_smtp:
+        mock_smtp.send.return_value = True
+        result = send_welcome_email("alice@test.com")
+        assert result is True
+        mock_smtp.send.assert_called_once()
+
+
+# patch as decorator
+@patch("myproject.users.database")
+def test_create_user(mock_db):
+    mock_db.insert.return_value = {"id": 1, "name": "Alice"}
+    user = create_user("Alice", "alice@test.com")
+    assert user["id"] == 1
+```
+
+### Mocking External APIs
+
+```python
+@pytest.fixture
+def mock_http(monkeypatch):
+    """Mock requests.get untuk semua tests."""
+    class MockResponse:
+        status_code = 200
+        def json(self):
+            return {"data": "mocked"}
+
+    monkeypatch.setattr("requests.get", lambda *a, **kw: MockResponse())
+
+
+def test_api_call(mock_http):
+    result = fetch_user_data(user_id=1)
+    assert result == {"data": "mocked"}
+```
+
+## Async Testing
+
+```python
+import pytest
+
+@pytest.mark.asyncio
+async def test_async_fetch():
+    result = await fetch_data("http://example.com")
+    assert result is not None
+
+@pytest.fixture
+async def async_client():
+    async with create_async_client() as client:
+        yield client
+
+@pytest.mark.asyncio
+async def test_with_client(async_client):
+    response = await async_client.get("/health")
+    assert response.status == 200
+```
+
+Install: `pip install pytest-asyncio`
+
+## Coverage
+
+```bash
+pip install pytest-cov
+
+# Run with coverage
+pytest --cov=src --cov-report=term-missing
+pytest --cov=src --cov-report=html    # HTML report
+
+# Enforce minimum
+pytest --cov=src --cov-fail-under=80
+```
+
+```toml
+# pyproject.toml
+[tool.coverage.run]
+source = ["src"]
+omit = ["*/tests/*", "*/__init__.py"]
+
+[tool.coverage.report]
+fail_under = 80
+show_missing = true
+```
+
+## Markers: Categorize Tests
+
+```python
+import pytest
+
+@pytest.mark.slow
+def test_large_dataset():
+    pass
+
+@pytest.mark.integration
+def test_database_connection():
+    pass
+
+@pytest.mark.skip(reason="Not implemented yet")
+def test_future_feature():
+    pass
+
+@pytest.mark.skipif(sys.platform == "win32", reason="Linux only")
+def test_linux_specific():
+    pass
+```
+
+```bash
+pytest -m "not slow"            # skip slow tests
+pytest -m "integration"         # only integration
+```
+
+## TDD Workflow
+
+```text
+1. RED   → Write test that fails
+2. GREEN → Write minimal code to pass
+3. REFACTOR → Clean up, maintain tests passing
+```
+
+```python
+# Step 1: RED
+def test_parse_csv_line():
+    result = parse_csv_line("Alice,30,Jakarta")
+    assert result == {"name": "Alice", "age": 30, "city": "Jakarta"}
+
+# Step 2: GREEN (minimal implementation)
+def parse_csv_line(line):
+    parts = line.split(",")
+    return {"name": parts[0], "age": int(parts[1]), "city": parts[2]}
+
+# Step 3: REFACTOR (handle edge cases, add more tests)
+```
+
+## Best Practices
+
+- Test behavior, bukan implementation detail
+- Satu assert per test (ideal, bukan strict rule)
+- Test nama deskriptif: `test_user_creation_with_invalid_email_raises_error`
+- Fast tests, mock external dependencies
+- Isolasi: setiap test independen, tidak bergantung urutan
+- AAA pattern: **A**rrange → **A**ct → **A**ssert
+
+```python
+def test_discount_applied_correctly():
+    # Arrange
+    cart = ShoppingCart()
+    cart.add_item("Laptop", price=10_000_000)
+
+    # Act
+    cart.apply_discount(percent=10)
+
+    # Assert
+    assert cart.total == 9_000_000
+```
+
+## Latihan Praktis
+
+1. Tulis test untuk fungsi `validate_email(email)`, test valid, invalid, edge cases
+2. Buat fixture `tmp_database` yang setup/teardown SQLite in-memory
+3. Mock HTTP API call dan test error handling (timeout, 404, 500)
+4. Capai 90% coverage di modul kecil (50-100 baris kode)
+
+## Rangkuman
+
+pytest + fixture + mocking + coverage = testing stack production Python. TDD memaksa desain yang testable. Target: 80%+ coverage, fast feedback loop, isolated tests.

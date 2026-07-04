@@ -1,0 +1,304 @@
+---
+title: "Linux Tutorial (12): Container dan Docker: Dari Konsep hingga Production"
+description: "Namespace, cgroups, image/layer, Dockerfile best practice, Docker Compose, networking, volume, dan security container di production."
+date: "2026-02-25"
+series: "Linux"
+tags: ["Linux", "Expert", "Docker", "Container", "DevOps"]
+---
+
+Container adalah evolusi natural dari skill Linux: namespace, cgroups, dan filesystem isolation yang sudah Anda pelajari, dibungkus menjadi unit deployable. Tutorial penutup seri ini membawa semuanya ke level production.
+
+## Evolusi: Bare Metal → VM → Container
+
+```text
+Bare Metal     →  OS langsung di hardware, isolasi kuat, density rendah
+Virtual Machine →  Hypervisor + guest OS per VM, overhead tinggi
+Container      →  Shared kernel, isolasi process-level, startup < 1 detik
+```
+
+Container **bukan VM**. Semua container di host yang sama share kernel Linux yang sama.
+
+## Building Blocks Linux Container
+
+### Namespaces: Isolasi View
+
+| Namespace | Isolasi |
+|-----------|---------|
+| PID | Process tree sendiri |
+| NET | Network stack (interface, routing) |
+| MNT | Filesystem mount points |
+| UTS | Hostname |
+| IPC | Inter-process communication |
+| USER | User/group IDs |
+
+```bash
+# Demo namespace isolation
+sudo unshare --pid --fork --mount-proc /bin/bash
+ps aux    # hanya proses di namespace ini
+```
+
+### cgroups: Resource Limits
+
+```bash
+# cgroup v2 (modern)
+cat /sys/fs/cgroup/cgroup.controllers
+
+# Limit memory proses
+echo "+memory" | sudo tee /sys/fs/cgroup/cgroup.subtree_control
+sudo mkdir /sys/fs/cgroup/myapp
+echo "256M" | sudo tee /sys/fs/cgroup/myapp/memory.max
+echo $$ | sudo tee /sys/fs/cgroup/myapp/cgroup.procs
+```
+
+Docker menggunakan cgroups untuk `--memory`, `--cpus`, dan `--pids-limit`.
+
+## Docker Fundamentals
+
+```bash
+# Install (Ubuntu)
+sudo apt install docker.io
+sudo systemctl enable --now docker
+sudo usermod -aG docker $USER   # jalankan tanpa sudo
+
+# Core commands
+docker run -d --name web -p 8080:80 nginx:alpine
+docker ps
+docker ps -a
+docker logs web
+docker logs -f web --tail 50
+docker exec -it web sh
+docker stop web && docker rm web
+```
+
+## Image dan Layer
+
+```bash
+# List images
+docker images
+
+# Pull specific tag
+docker pull python:3.12-slim
+
+# Inspect layers
+docker history python:3.12-slim
+
+# Remove unused
+docker image prune -a
+docker system df
+```
+
+Setiap instruksi Dockerfile = satu layer. Layer di-cache, urutan instruksi mempengaruhi build speed.
+
+## Dockerfile Best Practice
+
+```dockerfile
+# Multi-stage build: image kecil, aman
+FROM python:3.12-slim AS builder
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir --user -r requirements.txt
+
+FROM python:3.12-slim
+WORKDIR /app
+
+# Non-root user
+RUN groupadd -r appuser && useradd -r -g appuser appuser
+
+COPY --from=builder /root/.local /home/appuser/.local
+COPY --chown=appuser:appuser . .
+
+ENV PATH=/home/appuser/.local/bin:$PATH
+USER appuser
+
+EXPOSE 8000
+HEALTHCHECK --interval=30s --timeout=3s --retries=3 \
+  CMD curl -f http://localhost:8000/health || exit 1
+
+CMD ["gunicorn", "--bind", "0.0.0.0:8000", "app:application"]
+```
+
+**Prinsip**:
+- Multi-stage build untuk image production kecil
+- Non-root user (`USER appuser`)
+- `.dockerignore` untuk exclude file tidak perlu
+- Pin versi base image (`python:3.12-slim`, bukan `python:latest`)
+- `HEALTHCHECK` untuk orchestrator
+- Satu proses per container (PID 1 problem)
+
+```text
+# .dockerignore
+.git
+node_modules
+__pycache__
+*.pyc
+.env
+Dockerfile
+docker-compose*.yml
+```
+
+## Docker Compose
+
+```yaml
+# docker-compose.yml
+services:
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgres://dbuser:secret@db:5432/myapp
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: dbuser
+      POSTGRES_PASSWORD: secret
+      POSTGRES_DB: myapp
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dbuser -d myapp"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --maxmemory 128mb --maxmemory-policy allkeys-lru
+
+volumes:
+  pgdata:
+```
+
+```bash
+docker compose up -d
+docker compose ps
+docker compose logs -f app
+docker compose down
+docker compose down -v   # + hapus volumes
+```
+
+## Networking
+
+```bash
+# Network modes
+docker run --network host nginx          # share host network
+docker run --network none alpine         # no network
+docker run --network bridge nginx        # default
+
+# Custom network
+docker network create app-net
+docker run -d --name api --network app-net myapi
+docker run -d --name web --network app-net -p 8080:80 myweb
+# 'web' resolve 'api' via DNS internal Docker
+```
+
+## Volume dan Data Persistence
+
+```bash
+# Named volume (recommended)
+docker volume create app-data
+docker run -v app-data:/data myapp
+
+# Bind mount (development)
+docker run -v $(pwd)/src:/app/src myapp
+
+# tmpfs (sensitive temp data)
+docker run --tmpfs /tmp:rw,noexec,nosuid myapp
+
+# Backup volume
+docker run --rm -v pgdata:/data -v $(pwd):/backup alpine \
+  tar czf /backup/pgdata-backup.tar.gz /data
+```
+
+## Container Security
+
+```bash
+# Run read-only filesystem
+docker run --read-only --tmpfs /tmp myapp
+
+# Drop all capabilities, add only needed
+docker run --cap-drop=ALL --cap-add=NET_BIND_SERVICE myapp
+
+# No new privileges
+docker run --security-opt=no-new-privileges myapp
+
+# Resource limits
+docker run --memory=256m --cpus=0.5 --pids-limit=100 myapp
+
+# Scan image for vulnerabilities
+docker scout cves myapp:latest
+# atau
+trivy image myapp:latest
+```
+
+## Logging dan Monitoring
+
+```bash
+# Log driver
+docker run --log-driver=json-file --log-opt max-size=10m --log-opt max-file=3 myapp
+
+# Stats real-time
+docker stats
+
+# Inspect container
+docker inspect myapp --format='{{.State.Status}}'
+docker inspect myapp --format='{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}'
+```
+
+## Production Checklist
+
+- [ ] Non-root user di Dockerfile
+- [ ] Multi-stage build, image < 200MB jika memungkinkan
+- [ ] HEALTHCHECK defined
+- [ ] Resource limits (memory, CPU, pids)
+- [ ] Secrets via env file / Docker secrets, bukan hardcode
+- [ ] Read-only root filesystem jika memungkinkan
+- [ ] `--cap-drop=ALL` + minimal capabilities
+- [ ] Image vulnerability scan di CI/CD
+- [ ] Log rotation configured
+- [ ] Named volumes untuk stateful data
+
+## Dari Docker ke Orchestration
+
+```text
+Single host     →  Docker Compose (development/small prod)
+Multi host      →  Docker Swarm (simple orchestration)
+Production scale →  Kubernetes (industry standard)
+```
+
+Konsep yang transferable ke Kubernetes:
+- **Pod** ≈ group of containers
+- **Deployment** ≈ `docker compose up` with replicas
+- **Service** ≈ Docker network DNS + load balancing
+- **ConfigMap/Secret** ≈ env vars / Docker secrets
+- **PersistentVolume** ≈ Docker named volumes
+
+## Latihan Praktis
+
+1. Buat Dockerfile multi-stage untuk aplikasi Python/Node sederhana
+2. Setup docker-compose dengan app + database + health check
+3. Run container sebagai non-root, verify dengan `docker exec id`
+4. Scan image dengan `trivy image`, perbaiki vulnerability critical
+
+## Penutup Seri
+
+Selamat, Anda telah menempuh perjalanan dari **terminal dasar** hingga **container production**. Skill yang dibangun di 12 tutorial ini:
+
+| Level | Topik |
+|-------|-------|
+| Fundamental | Terminal, filesystem, permission |
+| Intermediate | Package manager, process, networking, scripting |
+| Advanced | Text processing, LVM, storage |
+| Expert | Security hardening, performance, Docker |
+
+Langkah selanjutnya: praktik di VM atau cloud (free tier), setup homelab, contribute ke open source, dan explore Kubernetes. **Linux dipelajari dengan melakukan**, bukan hanya membaca.

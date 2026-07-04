@@ -1,0 +1,299 @@
+---
+title: "Python Tutorial (9): Concurrency: Threading, Multiprocessing, dan Asyncio"
+description: "GIL, threading untuk I/O-bound, multiprocessing untuk CPU-bound, asyncio untuk high-concurrency I/O, dan kapan pakai yang mana."
+date: "2026-04-10"
+series: "Python"
+tags: ["Python", "Advanced", "Concurrency", "asyncio", "Threading"]
+---
+
+Python menyediakan tiga model concurrency, masing-masing optimal untuk use case berbeda. Memahami kapan pakai yang mana adalah kunci performa aplikasi.
+
+## GIL: The Elephant in the Room
+
+**Global Interpreter Lock (GIL)**: hanya satu thread yang eksekusi Python bytecode pada satu waktu. Implikasi:
+
+- Threading **tidak** mempercepat CPU-bound tasks
+- Threading **efektif** untuk I/O-bound tasks (network, file, database)
+- Untuk true parallelism CPU → gunakan multiprocessing
+
+## Threading: I/O-Bound Concurrency
+
+```python
+import threading
+import time
+from concurrent.futures import ThreadPoolExecutor
+
+
+def download(url):
+    """Simulate I/O-bound task."""
+    time.sleep(1)   # simulate network delay
+    return f"Downloaded: {url}"
+
+
+# Basic thread
+t = threading.Thread(target=download, args=("http://example.com",))
+t.start()
+t.join()    # wait until done
+
+# ThreadPoolExecutor (recommended)
+urls = [f"http://example.com/page/{i}" for i in range(10)]
+
+with ThreadPoolExecutor(max_workers=5) as executor:
+    futures = [executor.submit(download, url) for url in urls]
+    for future in futures:
+        print(future.result())
+```
+
+```python
+# map: simpler API
+with ThreadPoolExecutor(max_workers=5) as executor:
+    results = list(executor.map(download, urls))
+# 10 downloads in ~2s instead of 10s (5 workers)
+```
+
+### Thread Safety
+
+```python
+import threading
+
+counter = 0
+lock = threading.Lock()
+
+def increment():
+    global counter
+    for _ in range(100_000):
+        with lock:      # acquire/release lock
+            counter += 1
+
+threads = [threading.Thread(target=increment) for _ in range(4)]
+for t in threads:
+    t.start()
+for t in threads:
+    t.join()
+
+print(counter)   # 400000 (correct with lock)
+```
+
+## Multiprocessing: CPU-Bound Parallelism
+
+```python
+from multiprocessing import Pool, cpu_count
+from concurrent.futures import ProcessPoolExecutor
+import math
+
+
+def is_prime(n):
+    """CPU-intensive computation."""
+    if n < 2:
+        return False
+    for i in range(2, int(math.sqrt(n)) + 1):
+        if n % i == 0:
+            return False
+    return True
+
+
+# ProcessPoolExecutor
+numbers = range(1_000_000, 1_001_000)
+
+with ProcessPoolExecutor(max_workers=cpu_count()) as executor:
+    results = list(executor.map(is_prime, numbers))
+
+primes = [n for n, is_p in zip(numbers, results) if is_p]
+print(f"Found {len(primes)} primes")
+```
+
+```python
+# Pool with chunking (more efficient for many small tasks)
+with Pool(processes=cpu_count()) as pool:
+    results = pool.map(is_prime, numbers, chunksize=100)
+```
+
+### Shared State across Processes
+
+```python
+from multiprocessing import Value, Array, Manager
+
+# Shared memory
+shared_counter = Value('i', 0)    # integer
+shared_array = Array('d', [0.0] * 10)   # double array
+
+# Manager: more flexible (slower)
+with Manager() as manager:
+    shared_list = manager.list()
+    shared_dict = manager.dict()
+```
+
+## asyncio: High-Concurrency I/O
+
+asyncio = single-thread, cooperative multitasking. Ideal untuk thousands of concurrent I/O operations.
+
+```python
+import asyncio
+import aiohttp
+
+
+async def fetch(session, url):
+    """Async HTTP request."""
+    async with session.get(url) as response:
+        return await response.text()
+
+
+async def main():
+    urls = [f"http://example.com/page/{i}" for i in range(100)]
+
+    async with aiohttp.ClientSession() as session:
+        tasks = [fetch(session, url) for url in urls]
+        results = await asyncio.gather(*tasks)
+        print(f"Fetched {len(results)} pages")
+
+
+asyncio.run(main())
+```
+
+### async/await Basics
+
+```python
+import asyncio
+
+
+async def say_hello(name, delay):
+    await asyncio.sleep(delay)   # non-blocking sleep
+    print(f"Hello, {name}!")
+    return name
+
+
+async def main():
+    # Sequential
+    await say_hello("Alice", 1)
+    await say_hello("Bob", 1)
+    # Total: 2 seconds
+
+    # Concurrent
+    results = await asyncio.gather(
+        say_hello("Alice", 1),
+        say_hello("Bob", 1),
+        say_hello("Charlie", 1),
+    )
+    # Total: 1 second (parallel)
+    print(results)   # ['Alice', 'Bob', 'Charlie']
+
+
+asyncio.run(main())
+```
+
+### asyncio Patterns
+
+```python
+# Timeout
+async def fetch_with_timeout(url):
+    try:
+        async with asyncio.timeout(5):
+            return await fetch(url)
+    except asyncio.TimeoutError:
+        return None
+
+
+# Semaphore: limit concurrency
+sem = asyncio.Semaphore(10)
+
+async def limited_fetch(url):
+    async with sem:
+        return await fetch(url)
+
+
+# Queue: producer/consumer
+async def producer(queue):
+    for i in range(100):
+        await queue.put(i)
+    await queue.put(None)    # sentinel
+
+async def consumer(queue):
+    while True:
+        item = await queue.get()
+        if item is None:
+            break
+        await process(item)
+        queue.task_done()
+
+async def main():
+    queue = asyncio.Queue(maxsize=20)
+    await asyncio.gather(
+        producer(queue),
+        consumer(queue),
+        consumer(queue),   # multiple consumers
+    )
+```
+
+### Async Generator
+
+```python
+async def async_range(n, delay=0.1):
+    for i in range(n):
+        await asyncio.sleep(delay)
+        yield i
+
+
+async def main():
+    async for value in async_range(10):
+        print(value)
+```
+
+## Kapan Pakai Yang Mana?
+
+| Scenario | Solution | Mengapa |
+|----------|----------|---------|
+| HTTP requests (batch) | `asyncio` + `aiohttp` | High concurrency, single thread |
+| File downloads | `ThreadPoolExecutor` | I/O-bound, simple API |
+| Image processing | `ProcessPoolExecutor` | CPU-bound, bypass GIL |
+| Web scraping (1000+ URLs) | `asyncio` | Handles thousands of connections |
+| Data crunching | `multiprocessing` | True parallelism |
+| Mixed I/O + CPU | `asyncio` + `ProcessPoolExecutor` | Best of both |
+
+```python
+# Mixed: async I/O + CPU processing
+import asyncio
+from concurrent.futures import ProcessPoolExecutor
+
+def cpu_heavy(data):
+    return sum(x**2 for x in data)
+
+async def main():
+    loop = asyncio.get_event_loop()
+    with ProcessPoolExecutor() as pool:
+        result = await loop.run_in_executor(pool, cpu_heavy, range(10_000_000))
+    print(result)
+```
+
+## Error Handling in Async
+
+```python
+async def safe_fetch(url):
+    try:
+        return await fetch(url)
+    except aiohttp.ClientError as e:
+        print(f"Failed {url}: {e}")
+        return None
+
+
+async def main():
+    results = await asyncio.gather(
+        safe_fetch("http://good.com"),
+        safe_fetch("http://bad.com"),
+        return_exceptions=True,   # don't cancel on first error
+    )
+```
+
+## Latihan Praktis
+
+1. Download 20 URLs secara concurrent dengan `ThreadPoolExecutor`, lalu bandingkan waktu vs sequential
+2. Hitung bilangan prima di range besar dengan `ProcessPoolExecutor`, lalu bandingkan speedup vs single process
+3. Buat async web scraper yang fetch 100 pages dengan rate limiting (semaphore)
+4. Implementasi producer-consumer pattern dengan `asyncio.Queue`
+
+## Rangkuman
+
+- **Threading**: I/O-bound, simple parallelism, GIL-limited
+- **Multiprocessing**: CPU-bound, true parallelism, separate memory
+- **asyncio**: High-concurrency I/O, single thread, cooperative
+
+Pilihan yang benar bergantung pada apakah bottleneck di CPU atau I/O.

@@ -1,67 +1,53 @@
 import type { Metadata } from "next";
-import Link from "next/link";
-import { CalendarDays, Clock } from "lucide-react";
-import { getPosts } from "@/lib/content";
-import { formatDate } from "@/lib/utils";
+import { Terminal, Code } from "lucide-react";
+import { getSeries } from "@/lib/content";
 import { Reveal, StaggerList, StaggerItem } from "@/components/shared/motion";
-import { Badge } from "@/components/ui/badge";
-import { Card } from "@/components/ui/card";
+import { SeriesCourseCard } from "@/components/sections/series-course-card";
 
 export const revalidate = 3600;
 
 export const metadata: Metadata = {
-  title: "Blog",
+  title: "Tutorial",
   description:
-    "Catatan teknis Bagas Abiyu Kumara tentang system design, keputusan arsitektur, machine learning, dan pelajaran dari proyek nyata.",
+    "Study with me! Seri tutorial Linux dan Python lengkap dari fundamental hingga expert — belajar bareng step by step.",
   alternates: { canonical: "/blog" },
 };
 
+const SERIES_ICONS: Record<string, typeof Terminal> = {
+  linux: Terminal,
+  python: Code,
+};
+
 export default function BlogPage() {
-  const posts = getPosts();
+  const seriesList = getSeries();
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-16 sm:px-6">
+    <div className="mx-auto max-w-4xl px-4 py-16 sm:px-6">
       <Reveal>
-        <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">Blog</h1>
-        <p className="mt-3 text-muted-foreground">
-          Catatan teknis dari proyek nyata — system design, keputusan
-          arsitektur, dan pelajaran yang dipetik.
+        <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
+          Tutorial
+        </h1>
+        <p className="mt-3 text-lg font-medium text-foreground/80">
+          Study with me!
+        </p>
+        <p className="mt-2 text-muted-foreground">
+          Yuk belajar bareng dari nol, pilih seri yang kamu minati dan kita
+          jelajahi bersama, step by step sampai mahir.
         </p>
       </Reveal>
 
-      <StaggerList className="mt-10 space-y-5">
-        {posts.map((post) => (
-          <StaggerItem key={post.slug}>
-            <Card className="transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md motion-reduce:transition-none motion-reduce:hover:translate-y-0">
-              <Link
-                href={`/blog/${post.slug}`}
-                className="block p-6 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-              >
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                  <span className="inline-flex items-center gap-1.5">
-                    <CalendarDays className="h-3.5 w-3.5" aria-hidden="true" />
-                    <time dateTime={post.date}>{formatDate(post.date)}</time>
-                  </span>
-                  <span className="inline-flex items-center gap-1.5">
-                    <Clock className="h-3.5 w-3.5" aria-hidden="true" />
-                    {post.readingTime}
-                  </span>
-                </div>
-                <h2 className="mt-3 text-xl font-semibold leading-snug tracking-tight">
-                  {post.title}
-                </h2>
-                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-                  {post.description}
-                </p>
-                <div className="mt-4 flex flex-wrap gap-1.5">
-                  {post.tags.map((tag) => (
-                    <Badge key={tag} variant="accent" className="text-[11px]">
-                      {tag}
-                    </Badge>
-                  ))}
-                </div>
-              </Link>
-            </Card>
+      <StaggerList className="mt-10 grid grid-cols-1 gap-6 md:grid-cols-2">
+        {seriesList.map((series) => (
+          <StaggerItem key={series.slug}>
+            <SeriesCourseCard
+              title={series.title}
+              description={series.description}
+              href={`/blog/series/${series.slug}`}
+              totalPosts={series.totalPosts}
+              totalReadTime={series.totalReadingMinutes}
+              levels={series.levels}
+              icon={SERIES_ICONS[series.slug] ?? Terminal}
+            />
           </StaggerItem>
         ))}
       </StaggerList>

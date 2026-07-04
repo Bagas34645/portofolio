@@ -1,0 +1,300 @@
+---
+title: "Python Tutorial (8): Iterators, Generators, dan Decorators"
+description: "Protokol iterator, generator function/expression, yield, itertools, decorator pattern, functools.wraps, dan real-world use cases."
+date: "2026-04-05"
+series: "Python"
+tags: ["Python", "Advanced", "Generator", "Decorator", "Iterator"]
+---
+
+Tiga konsep ini membedakan Python developer intermediate dari advanced. Mereka membuat kode lebih memory-efficient, modular, dan elegant.
+
+## Iterator Protocol
+
+Iterable = object yang bisa diiterasi. Iterator = object yang meng-track posisi iterasi.
+
+```python
+# Setiap for loop menggunakan iterator protocol
+nums = [1, 2, 3]
+iterator = iter(nums)     # __iter__()
+next(iterator)            # 1, via __next__()
+next(iterator)            # 2
+next(iterator)            # 3
+next(iterator)            # StopIteration exception
+```
+
+### Custom Iterator
+
+```python
+class Countdown:
+    def __init__(self, start):
+        self.start = start
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        if self.start <= 0:
+            raise StopIteration
+        self.start -= 1
+        return self.start + 1
+
+
+for n in Countdown(5):
+    print(n)   # 5, 4, 3, 2, 1
+```
+
+## Generator Function
+
+Generator = cara mudah membuat iterator tanpa class boilerplate:
+
+```python
+def countdown(n):
+    while n > 0:
+        yield n
+        n -= 1
+
+
+for x in countdown(5):
+    print(x)   # 5, 4, 3, 2, 1
+
+gen = countdown(3)
+next(gen)   # 3
+next(gen)   # 2
+```
+
+**`yield`** pause fungsi dan kirim value. Saat `next()` dipanggil, fungsi resume dari titik yield terakhir.
+
+### Generator vs List: Memory
+
+```python
+# List: semua di memory sekaligus
+squares_list = [x**2 for x in range(10_000_000)]  # ~80MB RAM
+
+# Generator: satu item per waktu
+squares_gen = (x**2 for x in range(10_000_000))   # ~120 bytes!
+
+# Keduanya bisa diiterasi sama
+sum(squares_gen)    # works, tapi lazy
+```
+
+### Real-world: File Processing
+
+```python
+def read_large_file(filepath):
+    """Baca file besar tanpa load seluruh isi ke memory."""
+    with open(filepath) as f:
+        for line in f:
+            yield line.strip()
+
+
+def parse_logs(filepath):
+    """Pipeline processing lazy."""
+    for line in read_large_file(filepath):
+        if "ERROR" in line:
+            yield line
+
+
+error_count = sum(1 for _ in parse_logs("/var/log/app.log"))
+```
+
+### yield from
+
+Delegasi ke sub-generator:
+
+```python
+def flatten(nested):
+    for item in nested:
+        if isinstance(item, list):
+            yield from flatten(item)
+        else:
+            yield item
+
+
+list(flatten([1, [2, 3], [4, [5, 6]]]))
+# [1, 2, 3, 4, 5, 6]
+```
+
+## itertools: Power Tools
+
+```python
+from itertools import (
+    chain, islice, cycle, repeat,
+    combinations, permutations, product,
+    groupby, accumulate, starmap,
+    takewhile, dropwhile, filterfalse,
+)
+
+# chain: gabung iterables
+list(chain([1, 2], [3, 4]))          # [1, 2, 3, 4]
+
+# islice: slice untuk iterators
+list(islice(range(100), 5, 10))      # [5, 6, 7, 8, 9]
+
+# cycle: infinite repeat
+colors = cycle(["red", "green", "blue"])
+[next(colors) for _ in range(7)]
+
+# combinations & permutations
+list(combinations("ABC", 2))          # [('A','B'), ('A','C'), ('B','C')]
+list(permutations("ABC", 2))          # 6 items
+
+# groupby (input harus sorted by key!)
+data = [("web", "nginx"), ("web", "apache"), ("db", "postgres"), ("db", "mysql")]
+for category, items in groupby(data, key=lambda x: x[0]):
+    print(f"{category}: {[i[1] for i in items]}")
+
+# accumulate: running total
+list(accumulate([1, 2, 3, 4, 5]))    # [1, 3, 6, 10, 15]
+
+# takewhile / dropwhile
+list(takewhile(lambda x: x < 5, [1, 3, 5, 2, 1]))  # [1, 3]
+```
+
+## Decorator
+
+Decorator = fungsi yang memodifikasi/membungkus fungsi lain:
+
+```python
+import time
+from functools import wraps
+
+
+def timer(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        start = time.perf_counter()
+        result = func(*args, **kwargs)
+        elapsed = time.perf_counter() - start
+        print(f"{func.__name__} took {elapsed:.3f}s")
+        return result
+    return wrapper
+
+
+@timer
+def slow_function():
+    time.sleep(1)
+    return "done"
+
+slow_function()   # slow_function took 1.001s
+```
+
+`@wraps(func)` preserves `__name__`, `__doc__`, dan metadata fungsi asli.
+
+### Decorator dengan Argument
+
+```python
+def retry(max_attempts=3, delay=1):
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            for attempt in range(1, max_attempts + 1):
+                try:
+                    return func(*args, **kwargs)
+                except Exception as e:
+                    if attempt == max_attempts:
+                        raise
+                    print(f"Attempt {attempt} failed: {e}. Retrying...")
+                    time.sleep(delay)
+        return wrapper
+    return decorator
+
+
+@retry(max_attempts=5, delay=2)
+def fetch_data(url):
+    # bisa gagal karena network
+    pass
+```
+
+### Decorator Real-world Patterns
+
+```python
+# Caching / Memoization
+from functools import lru_cache
+
+@lru_cache(maxsize=128)
+def fibonacci(n):
+    if n < 2:
+        return n
+    return fibonacci(n - 1) + fibonacci(n - 2)
+
+
+# Validation
+def validate_types(**expected):
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            for name, value in kwargs.items():
+                if name in expected and not isinstance(value, expected[name]):
+                    raise TypeError(f"{name} must be {expected[name].__name__}")
+            return func(*args, **kwargs)
+        return wrapper
+    return decorator
+
+
+# Rate limiting
+def rate_limit(calls_per_second):
+    min_interval = 1.0 / calls_per_second
+    last_called = [0.0]
+
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            elapsed = time.time() - last_called[0]
+            if elapsed < min_interval:
+                time.sleep(min_interval - elapsed)
+            last_called[0] = time.time()
+            return func(*args, **kwargs)
+        return wrapper
+    return decorator
+```
+
+### Class Decorator
+
+```python
+class Singleton:
+    def __init__(self, cls):
+        self._cls = cls
+        self._instance = None
+
+    def __call__(self, *args, **kwargs):
+        if self._instance is None:
+            self._instance = self._cls(*args, **kwargs)
+        return self._instance
+
+
+@Singleton
+class Database:
+    def __init__(self, url):
+        self.url = url
+
+
+db1 = Database("postgres://localhost/db")
+db2 = Database("postgres://localhost/other")
+db1 is db2   # True, same instance
+```
+
+## Stacking Decorators
+
+```python
+@timer
+@retry(max_attempts=3)
+@rate_limit(10)
+def api_call(endpoint):
+    pass
+
+# Equivalent to:
+# api_call = timer(retry(max_attempts=3)(rate_limit(10)(api_call)))
+```
+
+Order: bottom decorator applied first, top decorator wraps the result.
+
+## Latihan Praktis
+
+1. Buat generator `infinite_primes()` yang yield bilangan prima tanpa batas
+2. Implementasi decorator `@cache_to_disk(filepath)` yang simpan result ke file JSON
+3. Gunakan `itertools.groupby` untuk group log entries per jam
+4. Buat decorator `@log_calls` yang log function name, arguments, dan return value
+
+## Rangkuman
+
+Generators membuat kode memory-efficient untuk data besar. Decorators membuat cross-cutting concerns (logging, caching, retry) reusable tanpa mengubah fungsi asli. Keduanya adalah building block Python advanced.

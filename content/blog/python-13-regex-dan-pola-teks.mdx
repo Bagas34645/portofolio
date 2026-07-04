@@ -1,0 +1,203 @@
+---
+title: "Python Tutorial (13): RegEx dan Pola Teks"
+description: "Modul re, pattern matching, grup capture, metacharacters, findall/sub/split, dan validasi input dengan regular expression."
+date: "2026-04-30"
+series: "Python"
+tags: ["Python", "Intermediate", "RegEx", "String"]
+---
+
+Regular Expression (RegEx) adalah bahasa pola untuk mencari, memvalidasi, dan memanipulasi teks. Python menyediakan modul `re` di standard library yang esensial untuk parsing log, validasi email, ekstraksi data, dan pembersihan string.
+
+## Mengapa RegEx?
+
+```python
+# Tanpa RegEx: fragile dan verbose
+email = "user@example.com"
+parts = email.split("@")
+valid = len(parts) == 2 and "." in parts[1]
+
+# Dengan RegEx: deklaratif dan reusable
+import re
+valid = bool(re.match(r"^[\w.-]+@[\w.-]+\.\w+$", email))
+```
+
+## Fungsi Utama modul `re`
+
+```python
+import re
+
+text = "Hubungi kami di support@example.com atau sales@example.org"
+
+# search: cari pertama kali cocok
+match = re.search(r"\w+@\w+\.\w+", text)
+match.group()   # 'support@example.com'
+
+# findall: semua kecocokan
+emails = re.findall(r"\w+@\w+\.\w+", text)
+# ['support@example.com', 'sales@example.org']
+
+# finditer: iterator dengan info posisi
+for m in re.finditer(r"\d+", "Order #12345, qty 3"):
+    print(m.group(), m.start(), m.end())
+
+# sub: ganti pola
+re.sub(r"\d+", "X", "abc123def456")   # 'abcXdefX'
+
+# split: pecah berdasarkan pola
+re.split(r"[,;\s]+", "a,b; c  d")     # ['a', 'b', 'c', 'd']
+```
+
+## Metacharacters Penting
+
+| Pola | Arti |
+|------|------|
+| `.` | Karakter apapun (kecuali newline) |
+| `\d` | Digit `[0-9]` |
+| `\D` | Non-digit |
+| `\w` | Word character `[a-zA-Z0-9_]` |
+| `\W` | Non-word |
+| `\s` | Whitespace |
+| `\S` | Non-whitespace |
+| `^` | Awal string |
+| `$` | Akhir string |
+| `[abc]` | Salah satu dari a, b, c |
+| `[a-z]` | Range karakter |
+| `[^abc]` | Negasi: bukan a, b, c |
+
+## Quantifiers
+
+```python
+import re
+
+re.findall(r"a+", "aaa b aa c")       # ['aaa', 'aa'] (satu atau lebih)
+re.findall(r"a?", "aaa b")            # ['a', 'a', 'a', '', ''] (nol atau satu)
+re.findall(r"a{2,4}", "aaaaa")        # ['aaaa'] (2 sampai 4 kali)
+re.findall(r"\d{3}-\d{4}", "0812-3456")  # ['0812-3456']
+```
+
+| Quantifier | Arti |
+|------------|------|
+| `*` | 0 atau lebih |
+| `+` | 1 atau lebih |
+| `?` | 0 atau 1 |
+| `{n}` | Tepat n kali |
+| `{n,m}` | Antara n dan m kali |
+
+## Grup Capture
+
+```python
+import re
+
+text = "John Doe, 30 tahun"
+pattern = r"(\w+)\s+(\w+),\s+(\d+)\s+tahun"
+match = re.search(pattern, text)
+
+match.group(0)    # 'John Doe, 30 tahun' (seluruh match)
+match.group(1)    # 'John'
+match.group(2)    # 'Doe'
+match.group(3)    # '30'
+match.groups()    # ('John', 'Doe', '30')
+
+# Named groups
+pattern = r"(?P<first>\w+)\s+(?P<last>\w+)"
+m = re.search(pattern, "Alice Smith")
+m.group("first")   # 'Alice'
+m.group("last")    # 'Smith'
+```
+
+## Flags
+
+```python
+import re
+
+# re.IGNORECASE / re.I
+re.search(r"python", "Python Rocks", re.I)
+
+# re.MULTILINE / re.M: ^ dan $ per baris
+text = "line1\nline2\nline3"
+re.findall(r"^line", text, re.M)   # ['line', 'line', 'line']
+
+# re.DOTALL / re.S: . match newline juga
+re.search(r"a.+b", "a\nb", re.S)
+
+# Kombinasi
+re.findall(r"ERROR.*", log, re.I | re.M)
+```
+
+## Raw String: Selalu Pakai `r"..."`
+
+Backslash di RegEx dan Python string bisa bentrok:
+
+```python
+# Buruk: perlu escape ganda
+re.search("\\d+", "123")
+
+# Baik: raw string
+re.search(r"\d+", "123")
+```
+
+## Validasi Input Praktis
+
+```python
+import re
+
+PATTERNS = {
+    "email": r"^[\w.-]+@[\w.-]+\.\w{2,}$",
+    "phone_id": r"^(\+62|0)8[1-9]\d{7,10}$",
+    "username": r"^[a-zA-Z][a-zA-Z0-9_]{2,19}$",
+    "ipv4": r"^(\d{1,3}\.){3}\d{1,3}$",
+}
+
+def validate(field: str, value: str) -> bool:
+    pattern = PATTERNS.get(field)
+    if not pattern:
+        raise ValueError(f"Unknown field: {field}")
+    return bool(re.fullmatch(pattern, value))
+
+validate("email", "user@example.com")   # True
+validate("email", "invalid-email")      # False
+```
+
+## Compile untuk Performa
+
+Jika pola dipakai berulang, compile sekali:
+
+```python
+import re
+
+EMAIL_RE = re.compile(r"^[\w.-]+@[\w.-]+\.\w{2,}$")
+
+def is_valid_email(email: str) -> bool:
+    return bool(EMAIL_RE.fullmatch(email))
+```
+
+## Contoh Real-World: Parse Log
+
+```python
+import re
+from datetime import datetime
+
+LOG_PATTERN = re.compile(
+    r"(?P<timestamp>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) "
+    r"(?P<level>\w+) "
+    r"(?P<message>.+)"
+)
+
+line = "2026-04-30 14:30:00 ERROR Database connection failed"
+match = LOG_PATTERN.match(line)
+if match:
+    data = match.groupdict()
+    data["timestamp"] = datetime.strptime(data["timestamp"], "%Y-%m-%d %H:%M:%S")
+    print(data)
+```
+
+## Latihan Praktis
+
+1. Tulis fungsi `extract_urls(text)` yang mengembalikan semua URL dari string
+2. Validasi password: minimal 8 karakter, ada huruf besar, huruf kecil, dan angka
+3. Parse file CSV-like dengan delimiter fleksibel (koma, tab, atau semicolon) menggunakan `re.split`
+4. Buat fungsi `redact_emails(text)` yang mengganti email dengan `[REDACTED]`
+
+## Rangkuman
+
+RegEx powerful untuk manipulasi teks terstruktur. Gunakan `re.search`/`findall` untuk ekstraksi, `re.sub` untuk transformasi, dan named groups untuk parsing yang readable. Selanjutnya: **datetime, math, dan modul utilitas standard library**.

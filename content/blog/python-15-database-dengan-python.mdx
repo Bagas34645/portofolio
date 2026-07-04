@@ -1,0 +1,242 @@
+---
+title: "Python Tutorial (15): Database dengan Python"
+description: "SQLite built-in, CRUD dengan sqlite3, parameterized query, MySQL/MongoDB intro, SQLAlchemy ORM, dan best practice keamanan database."
+date: "2026-05-10"
+series: "Python"
+tags: ["Python", "Intermediate", "Database", "SQLite", "SQL"]
+---
+
+Hampir setiap aplikasi production menyimpan data persisten. Python mendukung database relasional (SQLite, MySQL, PostgreSQL) dan NoSQL (MongoDB) dengan library yang mature. Tutorial ini mulai dari SQLite (zero setup) hingga pola production.
+
+## SQLite: Database Built-in
+
+SQLite tidak butuh server terpisah karena satu file sama dengan satu database. Perfect untuk prototyping, testing, dan aplikasi kecil.
+
+```python
+import sqlite3
+
+# Koneksi (buat file jika belum ada)
+conn = sqlite3.connect("app.db")
+cursor = conn.cursor()
+
+# Buat tabel
+cursor.execute("""
+    CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        email TEXT UNIQUE NOT NULL,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    )
+""")
+
+conn.commit()
+conn.close()
+```
+
+## CRUD dengan sqlite3
+
+```python
+import sqlite3
+
+def get_connection():
+    conn = sqlite3.connect("app.db")
+    conn.row_factory = sqlite3.Row   # akses kolom by name
+    return conn
+
+# CREATE
+def create_user(name: str, email: str) -> int:
+    with get_connection() as conn:
+        cursor = conn.execute(
+            "INSERT INTO users (name, email) VALUES (?, ?)",
+            (name, email),
+        )
+        conn.commit()
+        return cursor.lastrowid
+
+# READ
+def get_user(user_id: int) -> dict | None:
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT * FROM users WHERE id = ?", (user_id,)
+        ).fetchone()
+        return dict(row) if row else None
+
+def list_users(limit: int = 10) -> list[dict]:
+    with get_connection() as conn:
+        rows = conn.execute(
+            "SELECT * FROM users ORDER BY id DESC LIMIT ?", (limit,)
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+# UPDATE
+def update_user(user_id: int, name: str) -> bool:
+    with get_connection() as conn:
+        cursor = conn.execute(
+            "UPDATE users SET name = ? WHERE id = ?", (name, user_id)
+        )
+        conn.commit()
+        return cursor.rowcount > 0
+
+# DELETE
+def delete_user(user_id: int) -> bool:
+    with get_connection() as conn:
+        cursor = conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
+        conn.commit()
+        return cursor.rowcount > 0
+```
+
+## Keamanan: Parameterized Query
+
+**JANGAN** interpolasi string langsung ke SQL karena rentan SQL injection:
+
+```python
+# ❌ BAHAYA: SQL injection
+email = "'; DROP TABLE users; --"
+conn.execute(f"SELECT * FROM users WHERE email = '{email}'")
+
+# ✅ AMAN: parameterized query
+conn.execute("SELECT * FROM users WHERE email = ?", (email,))
+```
+
+## Context Manager dan Transaksi
+
+```python
+import sqlite3
+
+with sqlite3.connect("app.db") as conn:
+    try:
+        conn.execute("INSERT INTO users (name, email) VALUES (?, ?)", ("Alice", "a@x.com"))
+        conn.execute("INSERT INTO users (name, email) VALUES (?, ?)", ("Bob", "b@x.com"))
+        conn.commit()
+    except sqlite3.IntegrityError:
+        conn.rollback()
+        print("Email duplikat, transaksi dibatalkan")
+```
+
+## MySQL dengan mysql-connector-python
+
+```bash
+pip install mysql-connector-python
+```
+
+```python
+import mysql.connector
+
+conn = mysql.connector.connect(
+    host="localhost",
+    user="root",
+    password="secret",
+    database="myapp",
+)
+
+cursor = conn.cursor(dictionary=True)
+cursor.execute("SELECT * FROM users WHERE active = %s", (True,))
+users = cursor.fetchall()
+
+cursor.close()
+conn.close()
+```
+
+Placeholder MySQL: `%s` (bukan `?` seperti SQLite).
+
+## MongoDB dengan pymongo
+
+```bash
+pip install pymongo
+```
+
+```python
+from pymongo import MongoClient
+
+client = MongoClient("mongodb://localhost:27017")
+db = client["myapp"]
+users = db["users"]
+
+# Insert
+users.insert_one({"name": "Alice", "email": "alice@mail.com", "tags": ["admin"]})
+
+# Find
+alice = users.find_one({"email": "alice@mail.com"})
+all_users = list(users.find({"tags": "admin"}))
+
+# Update
+users.update_one(
+    {"email": "alice@mail.com"},
+    {"$set": {"name": "Alice Smith"}},
+)
+
+# Delete
+users.delete_one({"email": "alice@mail.com"})
+```
+
+MongoDB menyimpan dokumen JSON-like (BSON) yang fleksibel untuk schema yang berubah.
+
+## SQLAlchemy ORM (Production Pattern)
+
+ORM (Object-Relational Mapping) memetakan tabel ke class Python:
+
+```bash
+pip install sqlalchemy
+```
+
+```python
+from sqlalchemy import create_engine, Column, Integer, String, DateTime
+from sqlalchemy.orm import declarative_base, sessionmaker
+from datetime import datetime
+
+Base = declarative_base()
+
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String(100), nullable=False)
+    email = Column(String(255), unique=True, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+engine = create_engine("sqlite:///app.db")
+Base.metadata.create_all(engine)
+
+Session = sessionmaker(bind=engine)
+
+# CRUD via ORM
+with Session() as session:
+    user = User(name="Alice", email="alice@mail.com")
+    session.add(user)
+    session.commit()
+
+    users = session.query(User).filter(User.name.like("A%")).all()
+    for u in users:
+        print(u.id, u.name, u.email)
+```
+
+## Perbandingan Pilihan Database
+
+| Database | Cocok untuk | Setup |
+|----------|-------------|-------|
+| SQLite | Prototype, mobile, embedded | Zero |
+| PostgreSQL | Production web app | Server |
+| MySQL | Production, legacy | Server |
+| MongoDB | Dokumen fleksibel, JSON-heavy | Server |
+
+## Migration dengan Alembic (Preview)
+
+Schema database berubah seiring waktu. Alembic (dengan SQLAlchemy) melacak perubahan:
+
+```bash
+pip install alembic
+alembic init migrations
+alembic revision --autogenerate -m "add users table"
+alembic upgrade head
+```
+
+## Latihan Praktis
+
+1. Buat SQLite database buku (title, author, year, isbn) dengan CRUD lengkap
+2. Implementasi fungsi `search_books(query)` dengan LIKE query parameterized
+3. Buat script migrasi sederhana: tambah kolom `updated_at` ke tabel existing
+4. Bandingkan query SQL langsung vs SQLAlchemy ORM untuk operasi yang sama
+
+## Rangkuman
+
+Mulai dengan SQLite untuk belajar SQL tanpa setup. Selalu gunakan parameterized query. Untuk production, pertimbangkan PostgreSQL + SQLAlchemy + Alembic. MongoDB cocok untuk data dokumen. Selanjutnya: **NumPy dan Pandas untuk data science**.

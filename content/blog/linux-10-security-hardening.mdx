@@ -1,0 +1,275 @@
+---
+title: "Linux Tutorial (10): Security Hardening: Dari Baseline hingga Audit"
+description: "Hardening SSH, firewall defense-in-depth, SELinux/AppArmor, fail2ban, audit logging, dan checklist keamanan server production."
+date: "2026-02-15"
+series: "Linux"
+tags: ["Linux", "Expert", "Security", "Hardening"]
+---
+
+Server Linux di internet menghadapi scan otomatis dalam hitungan menit setelah online. Security hardening bukan opsional, ini baseline sebelum deploy aplikasi apapun.
+
+## Prinsip Defense in Depth
+
+```text
+Layer 1: Network     → Firewall, rate limiting
+Layer 2: Host        → SSH hardening, patching
+Layer 3: Application → Least privilege, input validation
+Layer 4: Data        → Encryption at rest/transit
+Layer 5: Monitoring  → Audit log, intrusion detection
+```
+
+## SSH Hardening
+
+File: `/etc/ssh/sshd_config`
+
+```text
+# Port non-default (security through obscurity: bukan cukup sendiri)
+Port 2222
+
+# Authentication
+PermitRootLogin no
+PasswordAuthentication no
+PubkeyAuthentication yes
+AuthenticationMethods publickey
+
+# Limit users
+AllowUsers deploy admin
+DenyUsers baduser
+
+# Session limits
+MaxAuthTries 3
+MaxSessions 5
+LoginGraceTime 30
+ClientAliveInterval 300
+ClientAliveCountMax 2
+
+# Disable forwarding jika tidak perlu
+AllowTcpForwarding no
+X11Forwarding no
+PermitTunnel no
+```
+
+```bash
+# Validasi config sebelum restart
+sudo sshd -t
+sudo systemctl restart sshd
+
+# Monitor failed attempts
+grep "Failed password" /var/log/auth.log | tail -20
+journalctl -u ssh --since "1 hour ago" | grep -i "failed"
+```
+
+## Firewall: Default Deny
+
+```bash
+# ufw baseline
+sudo ufw default deny incoming
+sudo ufw default allow outgoing
+sudo ufw allow 2222/tcp comment 'SSH'
+sudo ufw allow 80,443/tcp comment 'HTTP/HTTPS'
+sudo ufw enable
+
+# Rate limit SSH brute force
+sudo ufw limit 2222/tcp
+```
+
+## fail2ban: Intrusion Prevention
+
+```bash
+sudo apt install fail2ban
+
+# /etc/fail2ban/jail.local
+```
+
+```ini
+[DEFAULT]
+bantime  = 3600
+findtime = 600
+maxretry = 3
+backend  = systemd
+
+[sshd]
+enabled  = true
+port     = 2222
+filter   = sshd
+maxretry = 3
+bantime  = 86400
+
+[nginx-http-auth]
+enabled  = true
+filter   = nginx-http-auth
+port     = http,https
+logpath  = /var/log/nginx/error.log
+maxretry = 5
+```
+
+```bash
+sudo systemctl enable --now fail2ban
+sudo fail2ban-client status
+sudo fail2ban-client status sshd
+sudo fail2ban-client set sshd unbanip 192.168.1.100
+```
+
+## Mandatory Access Control
+
+### AppArmor (Ubuntu/Debian)
+
+```bash
+# Status
+sudo aa-status
+
+# Profile mode
+sudo aa-complain /usr/sbin/nginx    # log only
+sudo aa-enforce /usr/sbin/nginx     # enforce
+
+# List profiles
+ls /etc/apparmor.d/
+```
+
+### SELinux (RHEL/Fedora)
+
+```bash
+# Status
+getenforce                    # Enforcing / Permissive / Disabled
+sestatus
+
+# Context file
+ls -Z /var/www/html/
+ps -eZ | grep nginx
+
+# Restore default context
+sudo restorecon -Rv /var/www/html/
+
+# Troubleshoot denial
+sudo ausearch -m avc -ts recent
+sudo sealert -a /var/log/audit/audit.log
+```
+
+## Audit Logging
+
+```bash
+# Install auditd
+sudo apt install auditd audispd-plugins
+
+# Rules: /etc/audit/rules.d/hardening.rules
+-w /etc/passwd -p wa -k identity
+-w /etc/shadow -p wa -k identity
+-w /etc/ssh/sshd_config -p wa -k sshd_config
+-w /etc/sudoers -p wa -k sudoers
+-a always,exit -F arch=b64 -S execve -k exec_commands
+
+# Load rules
+sudo augenrules --load
+sudo systemctl restart auditd
+
+# Search audit log
+sudo ausearch -k identity --start today
+sudo ausearch -k sshd_config -i
+```
+
+## Automatic Security Updates
+
+```bash
+# Ubuntu unattended-upgrades
+sudo apt install unattended-upgrades apt-listchanges
+sudo dpkg-reconfigure -plow unattended-upgrades
+
+# /etc/apt/apt.conf.d/50unattended-upgrades
+# Unattended-Upgrade::Automatic-Reboot "false";
+# Unattended-Upgrade::Mail "admin@example.com";
+```
+
+## Kernel Hardening (sysctl)
+
+File: `/etc/sysctl.d/99-hardening.conf`
+
+```text
+# IP forwarding (disable jika bukan router)
+net.ipv4.ip_forward = 0
+
+# Ignore ICMP redirects
+net.ipv4.conf.all.accept_redirects = 0
+net.ipv6.conf.all.accept_redirects = 0
+
+# Ignore source routed packets
+net.ipv4.conf.all.accept_source_route = 0
+
+# SYN flood protection
+net.ipv4.tcp_syncookies = 1
+net.ipv4.tcp_max_syn_backlog = 2048
+
+# Log martian packets
+net.ipv4.conf.all.log_martians = 1
+
+# Restrict kernel pointer exposure
+kernel.kptr_restrict = 2
+
+# Restrict dmesg access
+kernel.dmesg_restrict = 1
+```
+
+```bash
+sudo sysctl --system
+sudo sysctl -p /etc/sysctl.d/99-hardening.conf
+```
+
+## File Integrity Monitoring
+
+```bash
+# AIDE: Advanced Intrusion Detection Environment
+sudo apt install aide
+sudo aideinit
+sudo cp /var/lib/aide/aide.db.new /var/lib/aide/aide.db
+
+# Check integrity
+sudo aide --check
+
+# Automate via cron/systemd timer
+```
+
+## Least Privilege Checklist
+
+```bash
+# Cek SUID binaries (attack surface)
+find / -perm -4000 -type f 2>/dev/null
+
+# Cek world-writable files
+find / -type f -perm -002 2>/dev/null
+
+# Cek file without owner
+find / -nouser -o -nogroup 2>/dev/null
+
+# Review sudo access
+sudo cat /etc/sudoers
+getent group sudo
+```
+
+## Security Audit Checklist
+
+- [ ] SSH: key-only, no root login, non-default port
+- [ ] Firewall: default deny, hanya port yang diperlukan
+- [ ] fail2ban aktif untuk SSH dan web auth
+- [ ] Automatic security updates enabled
+- [ ] Audit logging untuk file kritis
+- [ ] AppArmor/SELinux enforcing
+- [ ] sysctl hardening applied
+- [ ] User dengan least privilege
+- [ ] File integrity monitoring (AIDE)
+- [ ] Regular vulnerability scan (`lynis`, `rkhunter`)
+
+```bash
+# Lynis security audit
+sudo apt install lynis
+sudo lynis audit system
+```
+
+## Latihan Praktis
+
+1. Harden SSH, disable password auth, test login dengan key
+2. Setup fail2ban, simulasi brute force dengan `hydra` ke VM lokal
+3. Buat audit rule untuk monitor perubahan `/etc/nginx/`
+4. Jalankan `lynis audit system`, perbaiki 5 rekomendasi teratas
+
+## Rangkuman
+
+Security hardening adalah proses berkelanjutan, bukan one-time setup. Layer SSH + firewall + fail2ban + audit + patching otomatis membentuk baseline yang layak untuk server production.

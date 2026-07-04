@@ -1,0 +1,227 @@
+---
+title: "Python Tutorial (1): Pengenalan Python dan Setup Environment"
+description: "Mengapa Python populer, instalasi di Linux/Windows/macOS, sintaks dasar, output print, REPL interaktif, pip, dan menjalankan script pertama."
+date: "2026-03-01"
+series: "Python"
+tags: ["Python", "Fundamental", "Setup", "pip"]
+---
+
+Python adalah bahasa pemrograman high-level yang dikenal dengan sintaks bersih, ekosistem library raksasa, dan versatilitas. Mulai dari web development, data science, automation, hingga AI/ML, seri tutorial ini membawa Anda dari nol hingga production-ready, mengikuti kurikulum lengkap seperti [W3Schools Python](https://www.w3schools.com/python/) dan best practice industri.
+
+## Mengapa Python?
+
+- **Readable**: Indentasi sebagai blok kode, dipaksa menulis rapi
+- **Batteries included**: Standard library kaya (os, json, http, sqlite, dll.)
+- **Ekosistem**: PyPI menyediakan 500.000+ package
+- **Versatile**: Web (Django/FastAPI), Data (Pandas/NumPy), ML (PyTorch/scikit-learn), Automation
+- **Demand tinggi**: Salah satu bahasa paling dicari di industri
+
+## Peta Belajar Seri Ini
+
+| Bab | Topik | Level |
+|-----|-------|-------|
+| 1–3 | Setup, tipe data, control flow | Fundamental |
+| 4–6 | Fungsi, OOP, file I/O & exception | Fundamental–Intermediate |
+| 7–8 | venv, iterators/generators/decorators | Intermediate–Advanced |
+| 9–12 | Concurrency, testing, type hints, deployment | Advanced–Expert |
+| 13–18 | RegEx, datetime, database, NumPy/Pandas, visualisasi, ML | Intermediate–Advanced |
+
+## Sintaks Python Dasar
+
+Python case-sensitive dan tidak membutuhkan titik koma di akhir baris (opsional):
+
+```python
+# Satu statement per baris (umum)
+print("Hello")
+print("World")
+
+# Beberapa statement dalam satu baris (hindari kecuali sangat singkat)
+x = 1; y = 2
+
+# Statement panjang bisa dipecah dengan backslash atau tanda kurung
+total = (1 + 2 + 3 +
+         4 + 5)
+
+if True:
+    print("Blok if")   # indentasi wajib
+```
+
+Aturan penting:
+
+- **Indentasi 4 spasi** menandai blok kode (if, for, def, class)
+- **Nama variabel**: huruf, angka, underscore; tidak boleh diawali angka
+- **Kata kunci** (`if`, `for`, `class`, dll.) tidak boleh dipakai sebagai nama variabel
+
+## Output dengan print()
+
+`print()` menampilkan teks atau nilai ke stdout:
+
+```python
+print("Hello, World!")           # teks
+print(42)                         # angka
+print("Pi =", 3.14159)            # beberapa argumen, dipisah spasi
+print("a", "b", "c", sep="-")     # a-b-c
+print("Loading", end="...")       # tanpa newline di akhir
+print()                           # baris kosong
+
+# f-string: format output paling direkomendasikan
+name = "Alice"
+print(f"Halo, {name}! Umur: {25}")
+```
+
+## Input dari User
+
+```python
+nama = input("Siapa nama kamu? ")
+print(f"Halo, {nama}!")
+
+# input() selalu mengembalikan string, konversi eksplisit jika perlu angka
+umur = int(input("Berapa umur kamu? "))
+print(f"Tahun depan umurmu {umur + 1}")
+```
+
+## Instalasi Python
+
+### Linux (Debian/Ubuntu)
+
+```bash
+sudo apt update
+sudo apt install python3 python3-pip python3-venv
+
+python3 --version
+pip3 --version
+```
+
+### macOS
+
+```bash
+brew install python@3.12
+python3 --version
+```
+
+### Windows
+
+Download dari [python.org](https://python.org), centang **"Add Python to PATH"** saat install.
+
+```powershell
+python --version
+pip --version
+```
+
+## REPL: Interactive Python
+
+REPL (Read-Eval-Print Loop) sebuah playground instan untuk eksperimen:
+
+```python
+$ python3
+Python 3.12.x (...)
+>>> 2 + 2
+4
+>>> "hello" + " world"
+'hello world'
+>>> len("Python")
+6
+>>> type(42)
+<class 'int'>
+>>> exit()
+```
+
+Shortcut: `Ctrl+D` untuk keluar.
+
+## Script Pertama
+
+Buat file `hello.py`:
+
+```python
+name = input("Siapa nama kamu? ")
+print(f"Halo, {name}! Selamat belajar Python.")
+```
+
+Jalankan:
+
+```bash
+python3 hello.py
+```
+
+## Struktur Program Python
+
+```python
+#!/usr/bin/env python3
+"""Docstring modul: jelaskan apa yang dilakukan file ini."""
+
+import sys
+
+
+def main():
+    """Entry point program."""
+    print(f"Python {sys.version}")
+    print("Program berjalan!")
+
+
+if __name__ == "__main__":
+    main()
+```
+
+Pattern `if __name__ == "__main__"` memastikan `main()` hanya dipanggil saat file dijalankan langsung, bukan saat di-import.
+
+## pip: Package Manager
+
+```bash
+pip3 install requests
+pip3 install requests==2.31.0    # versi spesifik
+pip3 list                        # paket terinstall
+pip3 show requests               # detail paket
+pip3 uninstall requests
+
+pip3 freeze > requirements.txt   # export
+pip3 install -r requirements.txt # install dari file
+```
+
+## Komentar dan Docstring
+
+```python
+# Ini komentar satu baris
+
+"""
+Ini docstring multi-baris.
+Digunakan untuk dokumentasi fungsi, class, dan modul.
+"""
+
+def hitung_luas(panjang, lebar):
+    """Hitung luas persegi panjang."""
+    return panjang * lebar
+```
+
+## Indentasi = Blok Kode
+
+Python menggunakan indentasi (4 spasi standar) sebagai penanda blok, bukan kurung kurawal:
+
+```python
+if True:
+    print("Ini di dalam blok if")
+    print("Masih di dalam")
+print("Ini di luar blok if")
+```
+
+Mixing tab dan spasi = error. Gunakan **4 spasi** konsisten (konfigurasi editor).
+
+## IDE dan Editor
+
+| Editor | Kelebihan |
+|--------|-----------|
+| VS Code + Python ext | Gratis, ringan, debugging bagus |
+| PyCharm | Full IDE, refactoring kuat |
+| Vim/Neovim + LSP | Cepat, terminal-based |
+
+Rekomendasi pemula: **VS Code** dengan extension Python (Microsoft).
+
+## Latihan Praktis
+
+1. Install Python 3, verifikasi dengan `python3 --version`
+2. Buka REPL, coba operasi aritmatika dan string
+3. Buat script yang meminta input nama dan umur, lalu print pesan
+4. Install package `rich` dengan pip, coba `from rich import print`
+
+## Rangkuman
+
+Python terinstall, REPL siap, sintaks dasar dan `print()`/`input()` sudah familiar, dan Anda sudah menjalankan script pertama. Tutorial berikutnya membahas **tipe data, operator, dan variabel** sebagai fondasi untuk semua program Python.

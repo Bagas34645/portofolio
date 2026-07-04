@@ -1,0 +1,247 @@
+---
+title: "Linux Tutorial (6): Networking di Linux"
+description: "Interface dan routing, ip/ss commands, DNS resolution, firewall dengan ufw/nftables, serta troubleshooting koneksi."
+date: "2026-01-25"
+series: "Linux"
+tags: ["Linux", "Intermediate", "Networking", "Firewall"]
+---
+
+Server Linux hampir selalu "headless", interaksi utamanya lewat jaringan. Tutorial ini membahas konfigurasi interface, routing, DNS, firewall, dan troubleshooting yang dipakai di production.
+
+## Model OSI vs TCP/IP Praktis
+
+```text
+Aplikasi     →  HTTP, SSH, DNS
+Transport    →  TCP (reliable), UDP (fast)
+Network      →  IP, routing
+Link         →  Ethernet, WiFi (interface fisik)
+```
+
+Di Linux, kita kerja mostly di layer **Network** (IP) dan **Transport** (port).
+
+## Interface dan IP Address
+
+```bash
+# Modern (ganti ifconfig)
+ip addr show
+ip -br addr                    # ringkas
+ip link show
+
+# Assign IP sementara
+sudo ip addr add 192.168.1.100/24 dev eth0
+sudo ip link set eth0 up
+
+# Hapus IP
+sudo ip addr del 192.168.1.100/24 dev eth0
+```
+
+### Konfigurasi Permanen (Netplan: Ubuntu)
+
+File: `/etc/netplan/01-config.yaml`
+
+```yaml
+network:
+  version: 2
+  ethernets:
+    eth0:
+      dhcp4: false
+      addresses:
+        - 192.168.1.100/24
+      routes:
+        - to: default
+          via: 192.168.1.1
+      nameservers:
+        addresses:
+          - 8.8.8.8
+          - 1.1.1.1
+```
+
+```bash
+sudo netplan apply
+sudo netplan try   # rollback otomatis jika koneksi putus
+```
+
+## Routing
+
+```bash
+# Tabel routing
+ip route show
+route -n          # legacy, masih sering dipakai
+
+# Default gateway
+ip route | grep default
+
+# Tambah route statis
+sudo ip route add 10.0.0.0/8 via 192.168.1.254 dev eth0
+
+# Hapus route
+sudo ip route del 10.0.0.0/8
+```
+
+## Socket dan Koneksi: ss
+
+`ss` menggantikan `netstat`, lebih cepat dan informatif.
+
+```bash
+# Semua listening socket
+ss -tlnp          # TCP listen + process
+ss -ulnp          # UDP listen
+
+# Koneksi established
+ss -tnp state established
+
+# Filter port
+ss -tlnp sport = :443
+ss -tnp dport = :5432
+
+# Summary
+ss -s
+```
+
+Output `-tlnp`:
+- **State**: LISTEN, ESTAB
+- **Local/Peer**: IP:port
+- **Process**: PID/nama program
+
+## DNS Resolution
+
+```bash
+# Query DNS
+dig example.com
+dig example.com A +short
+dig @8.8.8.8 example.com MX
+
+# Alternatif
+nslookup example.com
+host example.com
+
+# File hosts lokal (prioritas sebelum DNS)
+cat /etc/hosts
+
+# Resolver config
+cat /etc/resolv.conf
+
+# systemd-resolved status
+resolvectl status
+resolvectl query example.com
+```
+
+## Connectivity Testing
+
+```bash
+# ICMP ping
+ping -c 4 8.8.8.8
+ping -c 4 google.com
+
+# Trace route
+traceroute google.com
+tracepath google.com
+mtr google.com          # kombinasi ping + traceroute
+
+# Test TCP port
+nc -zv example.com 443
+nc -zv 192.168.1.1 22
+
+# HTTP test
+curl -I https://example.com
+curl -v telnet://example.com:80
+wget --spider https://example.com
+```
+
+## Firewall: ufw (Ubuntu)
+
+```bash
+# Enable
+sudo ufw enable
+sudo ufw status verbose
+
+# Allow rules
+sudo ufw allow 22/tcp              # SSH
+sudo ufw allow from 10.0.0.0/8 to any port 5432
+sudo ufw allow in on eth0 to any port 443
+
+# Deny
+sudo ufw deny 3306/tcp
+
+# Delete rule
+sudo ufw delete allow 3306/tcp
+sudo ufw status numbered
+sudo ufw delete 3
+
+# Reset
+sudo ufw reset
+```
+
+## Firewall: nftables (Modern)
+
+```bash
+# List rules
+sudo nft list ruleset
+
+# Contoh: allow SSH + HTTP/HTTPS, drop rest
+sudo nft add table inet filter
+sudo nft add chain inet filter input { type filter hook input priority 0 \; policy drop \; }
+sudo nft add rule inet filter input ct state established,related accept
+sudo nft add rule inet filter input iif lo accept
+sudo nft add rule inet filter input tcp dport { 22, 80, 443 } accept
+```
+
+## SSH: Remote Access
+
+File: `/etc/ssh/sshd_config`
+
+```text
+Port 2222
+PermitRootLogin no
+PasswordAuthentication no
+PubkeyAuthentication yes
+AllowUsers deploy admin
+MaxAuthTries 3
+```
+
+```bash
+sudo systemctl restart sshd
+ssh -p 2222 deploy@server.example.com
+
+# Key-based auth
+ssh-keygen -t ed25519 -C "admin@laptop"
+ssh-copy-id -p 2222 deploy@server.example.com
+```
+
+## Troubleshooting Workflow
+
+```bash
+# 1. Interface up?
+ip link show eth0
+
+# 2. IP assigned?
+ip addr show eth0
+
+# 3. Gateway reachable?
+ping -c 2 $(ip route | awk '/default/ {print $3}')
+
+# 4. DNS works?
+ping -c 2 google.com
+dig google.com
+
+# 5. Port listening?
+ss -tlnp | grep :80
+
+# 6. Firewall blocking?
+sudo ufw status
+sudo nft list ruleset
+
+# 7. Check logs
+journalctl -u nginx --since "10 min ago"
+```
+
+## Latihan Praktis
+
+1. List semua listening port dengan `ss -tlnp`, identifikasi service apa saja
+2. Block port 8080 dengan ufw, test dengan `nc`, lalu allow kembali
+3. Setup SSH key authentication ke VM lokal
+4. Trace path ke `1.1.1.1` dengan `mtr`, identifikasi hop dengan latency tinggi
+
+## Rangkuman
+
+Networking Linux = interface + routing + DNS + firewall + troubleshooting sistematis. Skill ini langsung applicable ke deployment, debugging outage, dan hardening server.

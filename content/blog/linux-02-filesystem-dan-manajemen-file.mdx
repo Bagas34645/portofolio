@@ -1,0 +1,140 @@
+---
+title: "Linux Tutorial (2): File System dan Manajemen File"
+description: "Inode, hard link vs symlink, perintah find dan locate, arsip tar/gzip, serta monitoring penggunaan disk."
+date: "2026-01-05"
+series: "Linux"
+tags: ["Linux", "Fundamental", "Filesystem", "Storage"]
+---
+
+Setelah menguasai navigasi terminal, langkah berikutnya adalah memahami **bagaimana Linux menyimpan file** dan alat-alat untuk mengelola ribuan file di server production.
+
+## Inode: Identitas Sebenarnya File
+
+Di Linux, nama file hanyalah label. Data sebenarnya direferensikan oleh **inode**, struktur metadata yang menyimpan permission, owner, timestamp, dan pointer ke block data di disk.
+
+```bash
+# Lihat nomor inode
+ls -i file.txt
+
+# Detail inode
+stat file.txt
+```
+
+Output `stat` menampilkan inode number, ukuran, block count, dan tiga timestamp: **Access**, **Modify** (konten), **Change** (metadata).
+
+## Hard Link vs Symbolic Link
+
+```bash
+# Hard link: dua nama, satu inode (tidak bisa cross-filesystem)
+ln file.txt hardlink.txt
+
+# Symbolic link (symlink): pointer ke path lain
+ln -s /etc/nginx/nginx.conf ~/nginx.conf
+ln -s ../logs/app.log logs-simlink
+
+# Verifikasi
+ls -li file.txt hardlink.txt
+ls -la ~/nginx.conf
+```
+
+| Tipe | Cross-filesystem | Bisa link direktori | Saat target dihapus |
+|------|------------------|---------------------|---------------------|
+| Hard link | Tidak | Tidak | Data tetap ada |
+| Symlink | Ya | Ya | Link rusak (broken) |
+
+**Aturan praktis**: gunakan symlink untuk konfigurasi dan shortcut; hard link jarang dipakai sehari-hari.
+
+## Mencari File: find
+
+`find` adalah alat pencarian paling powerful, filter berdasarkan nama, ukuran, waktu modifikasi, permission, dan eksekusi aksi.
+
+```bash
+# Cari file bernama nginx.conf di bawah /etc
+find /etc -name "nginx.conf" 2>/dev/null
+
+# Cari file .log lebih besar dari 100 MB
+find /var/log -name "*.log" -size +100M
+
+# Cari file dimodifikasi dalam 7 hari terakhir
+find /home -type f -mtime -7
+
+# Cari dan hapus file .tmp lebih tua dari 30 hari (hati-hati!)
+find /tmp -name "*.tmp" -mtime +30 -delete
+
+# Cari direktori dengan permission world-writable (risiko keamanan)
+find / -type d -perm -0002 2>/dev/null
+```
+
+## Database Pencarian: locate
+
+`find` scan real-time (lambat di filesystem besar). `locate` menggunakan database terindeks:
+
+```bash
+# Update database (butuh root)
+sudo updatedb
+
+# Cari cepat
+locate nginx.conf
+locate -i "*.conf"   # case-insensitive
+```
+
+## Arsip dan Kompresi
+
+```bash
+# Buat arsip tar
+tar -cvf backup.tar /home/user/docs
+
+# Tar + gzip (paling umum)
+tar -czvf backup.tar.gz /home/user/docs
+
+# Tar + xz (kompresi lebih baik, lebih lambat)
+tar -cJvf backup.tar.xz /home/user/docs
+
+# Ekstrak
+tar -xzvf backup.tar.gz
+tar -xzvf backup.tar.gz -C /tmp/restore/   # ke direktori spesifik
+
+# Kompresi single file
+gzip file.txt          # → file.txt.gz
+gunzip file.txt.gz
+```
+
+## Monitoring Disk
+
+```bash
+# Penggunaan disk per filesystem
+df -h
+
+# Penggunaan disk per direktori
+du -sh /var/log/*
+du -h --max-depth=1 /home
+
+# 10 direktori terbesar di /
+sudo du -h / 2>/dev/null | sort -rh | head -10
+```
+
+## Mount dan Filesystem
+
+```bash
+# Lihat mount aktif
+mount | column -t
+findmnt
+
+# Mount manual (sementara)
+sudo mount /dev/sdb1 /mnt/data
+
+# /etc/fstab: mount permanen saat boot
+# Format: device  mountpoint  fstype  options  dump  pass
+# /dev/sdb1  /data  ext4  defaults  0  2
+```
+
+## Latihan Praktis
+
+1. Buat file `test.txt`, buat hard link dan symlink, lalu hapus original, amati perbedaannya
+2. Gunakan `find ~ -type f -name "*.md" -mtime -30` untuk list markdown file bulan ini
+3. Arsip direktori `~/belajar-linux` menjadi `belajar-linux.tar.gz`
+4. Jalankan `df -h` dan `du -sh /*`, identifikasi partisi mana yang hampir penuh
+
+## Rangkuman
+
+Anda memahami inode, perbedaan link, pencarian file dengan `find`/`locate`, arsip `tar`, dan monitoring disk. Tutorial selanjutnya: **permission, user, dan group**, fondasi keamanan multi-user Linux.

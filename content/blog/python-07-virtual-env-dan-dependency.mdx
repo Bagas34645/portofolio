@@ -1,0 +1,277 @@
+---
+title: "Python Tutorial (7): Virtual Environment dan Dependency Management"
+description: "venv, pip, requirements.txt, Poetry, pyproject.toml, dan strategi reproducible environment untuk project Python."
+date: "2026-03-30"
+series: "Python"
+tags: ["Python", "Intermediate", "venv", "Poetry", "pip"]
+---
+
+Setiap project Python harus memiliki environment terisolasi. Dependency project A tidak boleh bertabrakan dengan project B. Tutorial ini membahas tools dan best practice dependency management.
+
+## Mengapa Virtual Environment?
+
+Tanpa isolasi:
+
+```text
+System Python:
+  requests==2.25    ← project A butuh ini
+  requests==2.31    ← project B butuh ini
+  ❌ Konflik!
+```
+
+Dengan venv:
+
+```text
+project-a/.venv → requests==2.25 ✅
+project-b/.venv → requests==2.31 ✅
+```
+
+## venv: Built-in Solution
+
+```bash
+# Buat virtual environment
+python3 -m venv .venv
+
+# Aktivasi
+source .venv/bin/activate       # Linux/macOS
+# .venv\Scripts\activate        # Windows
+
+# Verifikasi
+which python       # .venv/bin/python
+python --version
+pip --version
+
+# Deaktivasi
+deactivate
+```
+
+**Convention**: nama `.venv` atau `venv`, tambahkan ke `.gitignore`.
+
+## pip dan requirements.txt
+
+```bash
+# Install package
+pip install requests flask sqlalchemy
+
+# Install versi spesifik
+pip install "requests>=2.28,<3.0"
+pip install "django~=4.2"     # compatible release (4.2.x)
+
+# Export dependency
+pip freeze > requirements.txt
+
+# Install dari file
+pip install -r requirements.txt
+
+# Upgrade
+pip install --upgrade requests
+pip install --upgrade pip
+```
+
+### requirements.txt Best Practice
+
+```text
+# requirements.txt: pin exact versions untuk reproducibility
+requests==2.31.0
+flask==3.0.0
+sqlalchemy==2.0.23
+gunicorn==21.2.0
+```
+
+```text
+# requirements-dev.txt: development dependencies
+-r requirements.txt
+pytest==7.4.3
+ruff==0.1.8
+mypy==1.7.1
+```
+
+## pip-tools: Lebih Baik dari Freeze
+
+```bash
+pip install pip-tools
+
+# requirements.in: deklarasi top-level dependency
+# requirements.txt: generated, pinned, resolved
+```
+
+```text
+# requirements.in
+flask
+sqlalchemy
+celery
+```
+
+```bash
+pip-compile requirements.in    # → requirements.txt with hashes
+pip-sync requirements.txt      # sync environment exactly
+```
+
+## Poetry: Modern Dependency Management
+
+Poetry menggabungkan venv management, dependency resolution, dan packaging.
+
+```bash
+# Install Poetry
+curl -sSL https://install.python-poetry.org | python3 -
+
+# Buat project baru
+poetry new myproject
+
+# Atau init di project existing
+cd myproject
+poetry init
+
+# Install dependency
+poetry add requests flask
+poetry add --group dev pytest ruff
+
+# Install semua dari lock file
+poetry install
+
+# Run di venv Poetry
+poetry run python main.py
+poetry run pytest
+
+# Shell aktivasi
+poetry shell
+```
+
+### pyproject.toml
+
+```toml
+[tool.poetry]
+name = "myproject"
+version = "0.1.0"
+description = "My awesome project"
+authors = ["Alice <alice@mail.com>"]
+python = "^3.11"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+flask = "^3.0"
+sqlalchemy = "^2.0"
+pydantic = "^2.5"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.4"
+ruff = "^0.1"
+mypy = "^1.7"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+```
+
+### poetry.lock
+
+File lock = snapshot exact version semua dependency (termasuk transitive). **COMMIT file ini ke git** untuk reproducibility.
+
+## uv: Blazing Fast Alternative
+
+```bash
+# Install uv
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Buat project
+uv init myproject && cd myproject
+
+# Add dependencies
+uv add requests flask
+uv add --dev pytest ruff
+
+# Sync environment
+uv sync
+
+# Run
+uv run python main.py
+uv run pytest
+```
+
+`uv` sangat cepat (10-100x pip) dan compatible dengan pip ecosystem.
+
+## pyproject.toml: Standard Modern
+
+Semua tools modern converge ke `pyproject.toml` (PEP 621):
+
+```toml
+[project]
+name = "myproject"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+    "flask>=3.0",
+    "sqlalchemy>=2.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4",
+    "ruff>=0.1",
+]
+
+[tool.ruff]
+line-length = 100
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+```
+
+## Strategi Project Structure
+
+```text
+myproject/
+├── pyproject.toml          # project metadata + dependencies
+├── poetry.lock / uv.lock  # lock file (commit!)
+├── .python-version         # Python version (pyenv)
+├── .gitignore
+├── README.md
+├── src/
+│   └── myproject/
+│       ├── __init__.py
+│       ├── main.py
+│       └── utils.py
+├── tests/
+│   ├── __init__.py
+│   └── test_main.py
+└── .venv/                  # JANGAN commit
+```
+
+`.gitignore`:
+```text
+.venv/
+__pycache__/
+*.pyc
+dist/
+*.egg-info/
+.env
+```
+
+## Multiple Python Versions: pyenv
+
+```bash
+# Install pyenv
+curl https://pyenv.run | bash
+
+# Install Python version
+pyenv install 3.12.1
+pyenv install 3.11.7
+
+# Set per-project
+cd myproject
+pyenv local 3.12.1    # buat .python-version
+
+# Global default
+pyenv global 3.12.1
+```
+
+## Latihan Praktis
+
+1. Buat project dengan venv, install 3 package, export requirements.txt
+2. Setup project baru dengan Poetry atau uv, tambahkan dev dependencies
+3. Buat `.gitignore` yang tepat untuk Python project
+4. Coba lock file: install di mesin lain, verifikasi versi identik
+
+## Rangkuman
+
+Dependency management yang benar = reproducible builds. Gunakan venv minimal, Poetry/uv untuk project serius. Selalu pin versions dan commit lock file. Tutorial selanjutnya: **iterators, generators, dan decorators**.

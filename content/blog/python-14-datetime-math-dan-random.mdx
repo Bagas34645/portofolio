@@ -1,0 +1,213 @@
+---
+title: "Python Tutorial (14): datetime, math, dan random"
+description: "Tanggal/waktu dengan datetime, operasi math, angka acak, timezone, timedelta, dan modul utilitas numerik Python."
+date: "2026-05-05"
+series: "Python"
+tags: ["Python", "Intermediate", "datetime", "math", "Standard Library"]
+---
+
+Standard library Python menyediakan modul siap pakai untuk tanggal, matematika, dan angka acak tanpa perlu install package eksternal. Tutorial ini melengkapi fondasi W3Schools dengan praktik production.
+
+## Modul datetime
+
+```python
+import datetime
+
+# Tanggal dan waktu saat ini
+now = datetime.datetime.now()
+today = datetime.date.today()
+
+print(now)           # 2026-05-05 14:30:00.123456
+print(today)         # 2026-05-05
+print(now.year, now.month, now.day)
+print(now.hour, now.minute, now.second)
+```
+
+### Membuat datetime Spesifik
+
+```python
+import datetime
+
+d = datetime.date(2026, 5, 5)
+t = datetime.time(14, 30, 0)
+dt = datetime.datetime(2026, 5, 5, 14, 30, 0)
+
+# Dari string
+parsed = datetime.datetime.strptime("2026-05-05 14:30", "%Y-%m-%d %H:%M")
+formatted = parsed.strftime("%d/%m/%Y %H:%M")   # '05/05/2026 14:30'
+```
+
+### Format Codes Umum
+
+| Code | Arti | Contoh |
+|------|------|--------|
+| `%Y` | Tahun 4 digit | 2026 |
+| `%m` | Bulan 01-12 | 05 |
+| `%d` | Hari 01-31 | 05 |
+| `%H` | Jam 00-23 | 14 |
+| `%M` | Menit 00-59 | 30 |
+| `%S` | Detik 00-59 | 00 |
+| `%A` | Nama hari | Monday |
+| `%B` | Nama bulan | May |
+
+### timedelta: Operasi Tanggal
+
+```python
+import datetime
+
+today = datetime.date.today()
+tomorrow = today + datetime.timedelta(days=1)
+week_ago = today - datetime.timedelta(weeks=1)
+in_3_hours = datetime.datetime.now() + datetime.timedelta(hours=3)
+
+# Selisih dua tanggal
+deadline = datetime.date(2026, 12, 31)
+days_left = (deadline - today).days
+print(f"Sisa {days_left} hari")
+```
+
+### Timezone-aware datetime
+
+```python
+from datetime import datetime, timezone, timedelta
+
+# UTC
+utc_now = datetime.now(timezone.utc)
+
+# Timezone custom (WIB = UTC+7)
+WIB = timezone(timedelta(hours=7))
+wib_now = datetime.now(WIB)
+
+# Konversi
+utc_now.astimezone(WIB)
+```
+
+## Modul math
+
+```python
+import math
+
+math.pi          # 3.141592653589793
+math.e           # 2.718281828459045
+
+math.sqrt(16)    # 4.0
+math.pow(2, 10)  # 1024.0
+math.log(100, 10)  # 2.0 (log base 10)
+math.log2(8)     # 3.0
+math.log10(1000) # 3.0
+
+math.ceil(4.2)   # 5
+math.floor(4.8)  # 4
+math.trunc(4.8)  # 4
+
+math.sin(math.pi / 2)   # 1.0
+math.cos(0)             # 1.0
+math.degrees(math.pi)   # 180.0
+math.radians(180)       # 3.14159...
+
+math.factorial(5)  # 120
+math.gcd(48, 18)   # 6 (greatest common divisor)
+math.isnan(float("nan"))  # True
+math.isinf(float("inf"))  # True
+```
+
+### math vs operator
+
+```python
+# Untuk operasi dasar, operator cukup
+2 ** 10          # 1024
+abs(-5)          # 5 (built-in)
+
+# math untuk fungsi transcendental dan utilitas
+import math
+math.sqrt(2)     # tidak ada operator sqrt
+```
+
+## Modul random
+
+```python
+import random
+
+random.random()              # float 0.0 <= x < 1.0
+random.randint(1, 10)        # integer inclusive 1-10
+random.uniform(1.0, 10.0)    # float dalam range
+
+items = ["apel", "jeruk", "mangga"]
+random.choice(items)         # satu elemen acak
+random.choices(items, k=3)   # dengan replacement
+random.sample(items, 2)      # tanpa replacement
+
+random.shuffle(items)        # in-place shuffle
+
+# Seed untuk reproducibility (testing)
+random.seed(42)
+random.randint(1, 100)   # selalu sama jika seed sama
+```
+
+### random vs secrets
+
+```python
+import random
+import secrets
+
+# random: simulasi, game, sampling (BUKAN untuk keamanan)
+random.randint(1000, 9999)
+
+# secrets: token, password, kriptografi
+secrets.token_hex(16)        # 'a3f2b1...'
+secrets.choice("abcdef")     # aman untuk security
+```
+
+## Modul statistics (Bonus)
+
+```python
+import statistics
+
+data = [4, 7, 13, 16, 23, 24, 25, 29, 30, 31]
+
+statistics.mean(data)        # 20.2
+statistics.median(data)      # 24.5
+statistics.mode([1, 2, 2, 3])  # 2
+statistics.stdev(data)       # sample standard deviation
+statistics.variance(data)
+```
+
+## Contoh Praktis: Age Calculator
+
+```python
+from datetime import date
+
+def calculate_age(birth_date: date) -> int:
+    today = date.today()
+    age = today.year - birth_date.year
+    if (today.month, today.day) < (birth_date.month, birth_date.day):
+        age -= 1
+    return age
+
+birth = date(1995, 8, 15)
+print(f"Umur: {calculate_age(birth)} tahun")
+```
+
+## Contoh Praktis: Expiry Checker
+
+```python
+from datetime import datetime, timedelta
+
+def is_expired(created_at: datetime, ttl_days: int) -> bool:
+    expiry = created_at + timedelta(days=ttl_days)
+    return datetime.now() > expiry
+
+token_created = datetime(2026, 4, 1)
+print(is_expired(token_created, ttl_days=30))
+```
+
+## Latihan Praktis
+
+1. Buat fungsi format tanggal Indonesia: `"5 Mei 2026"`
+2. Hitung jumlah hari kerja (Senin–Jumat) antara dua tanggal
+3. Simulasi lempar dadu 10.000 kali, hitung distribusi mata dadu
+4. Buat generator password 12 karakter dengan `secrets` (huruf, angka, simbol)
+
+## Rangkuman
+
+`datetime` untuk semua operasi tanggal/waktu, `math` untuk fungsi numerik lanjutan, `random` untuk simulasi dan `secrets` untuk keamanan. Modul-modul ini sering dipakai sebelum masuk ke database dan data science. Selanjutnya: **database dengan Python**.

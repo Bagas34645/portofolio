@@ -1,0 +1,246 @@
+---
+title: "Python Tutorial (17): Visualisasi Data dengan Matplotlib"
+description: "Line chart, bar chart, scatter plot, histogram, subplot, styling, dan visualisasi DataFrame Pandas dengan Matplotlib."
+date: "2026-05-20"
+series: "Python"
+tags: ["Python", "Advanced", "Matplotlib", "Visualization", "Data Science"]
+---
+
+Visualisasi mengubah angka menjadi insight. **Matplotlib** adalah library plotting fundamental Python dan semua library visualisasi modern (Seaborn, Plotly) dibangun di atasnya. Tutorial ini membahas chart esensial untuk analisis data.
+
+## Instalasi dan Setup
+
+```bash
+pip install matplotlib
+```
+
+```python
+import matplotlib.pyplot as plt
+import numpy as np
+
+# Inline di Jupyter notebook
+# %matplotlib inline
+
+# Style (opsional)
+plt.style.use("seaborn-v0_8-whitegrid")
+```
+
+## Line Plot
+
+```python
+import matplotlib.pyplot as plt
+import numpy as np
+
+x = np.linspace(0, 10, 100)
+y = np.sin(x)
+
+plt.figure(figsize=(10, 5))
+plt.plot(x, y, label="sin(x)", color="blue", linewidth=2)
+plt.plot(x, np.cos(x), label="cos(x)", color="red", linestyle="--")
+
+plt.title("Fungsi Trigonometri")
+plt.xlabel("x")
+plt.ylabel("y")
+plt.legend()
+plt.grid(True, alpha=0.3)
+plt.tight_layout()
+plt.savefig("trig_plot.png", dpi=150)
+plt.show()
+```
+
+## Bar Chart
+
+```python
+import matplotlib.pyplot as plt
+
+categories = ["Python", "JavaScript", "Java", "Go", "Rust"]
+popularity = [29.5, 22.5, 17.8, 8.2, 3.5]
+
+plt.figure(figsize=(8, 5))
+bars = plt.bar(categories, popularity, color="steelblue", edgecolor="black")
+
+for bar, val in zip(bars, popularity):
+    plt.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.3,
+             f"{val}%", ha="center", fontsize=10)
+
+plt.title("Popularitas Bahasa Pemrograman 2026")
+plt.ylabel("Persentase (%)")
+plt.tight_layout()
+plt.show()
+```
+
+## Horizontal Bar
+
+```python
+import matplotlib.pyplot as plt
+
+labels = ["Jakarta", "Surabaya", "Bandung", "Medan"]
+values = [45, 28, 22, 15]
+
+plt.barh(labels, values, color="coral")
+plt.xlabel("Populasi (juta)")
+plt.title("Populasi Kota Besar")
+plt.show()
+```
+
+## Scatter Plot
+
+```python
+import matplotlib.pyplot as plt
+import numpy as np
+
+np.random.seed(42)
+n = 100
+x = np.random.randn(n)
+y = 2 * x + np.random.randn(n) * 0.5
+colors = np.random.rand(n)
+sizes = np.random.randint(20, 200, n)
+
+plt.figure(figsize=(8, 6))
+plt.scatter(x, y, c=colors, s=sizes, alpha=0.6, cmap="viridis")
+plt.colorbar(label="Color value")
+plt.xlabel("Feature X")
+plt.ylabel("Feature Y")
+plt.title("Scatter Plot dengan Color & Size")
+plt.show()
+```
+
+## Histogram
+
+```python
+import matplotlib.pyplot as plt
+import numpy as np
+
+data = np.random.normal(loc=50, scale=15, size=1000)
+
+plt.figure(figsize=(8, 5))
+plt.hist(data, bins=30, color="skyblue", edgecolor="black", alpha=0.7)
+plt.axvline(data.mean(), color="red", linestyle="--", label=f"Mean: {data.mean():.1f}")
+plt.xlabel("Value")
+plt.ylabel("Frequency")
+plt.title("Distribusi Normal")
+plt.legend()
+plt.show()
+```
+
+## Pie Chart
+
+```python
+import matplotlib.pyplot as plt
+
+labels = ["Desktop", "Mobile", "Tablet"]
+sizes = [45, 48, 7]
+explode = (0, 0.05, 0)
+colors = ["#ff9999", "#66b3ff", "#99ff99"]
+
+plt.pie(sizes, explode=explode, labels=labels, colors=colors,
+        autopct="%1.1f%%", shadow=True, startangle=90)
+plt.title("Traffic by Device")
+plt.axis("equal")
+plt.show()
+```
+
+## Subplot: Multiple Charts
+
+```python
+import matplotlib.pyplot as plt
+import numpy as np
+
+fig, axes = plt.subplots(2, 2, figsize=(12, 8))
+
+x = np.linspace(0, 10, 50)
+
+axes[0, 0].plot(x, np.sin(x))
+axes[0, 0].set_title("Sin")
+
+axes[0, 1].plot(x, np.cos(x), color="orange")
+axes[0, 1].set_title("Cos")
+
+axes[1, 0].bar(["A", "B", "C"], [3, 7, 5])
+axes[1, 0].set_title("Bar")
+
+axes[1, 1].scatter(np.random.rand(30), np.random.rand(30))
+axes[1, 1].set_title("Scatter")
+
+plt.suptitle("Dashboard 2×2", fontsize=14)
+plt.tight_layout()
+plt.show()
+```
+
+## Visualisasi Pandas DataFrame
+
+```python
+import pandas as pd
+import matplotlib.pyplot as plt
+
+df = pd.DataFrame({
+    "month": ["Jan", "Feb", "Mar", "Apr", "May", "Jun"],
+    "revenue": [120, 135, 148, 142, 160, 175],
+    "cost": [80, 85, 90, 88, 95, 100],
+})
+
+# Line plot langsung dari DataFrame
+df.plot(x="month", y=["revenue", "cost"], figsize=(10, 5), marker="o")
+plt.title("Revenue vs Cost 2026")
+plt.ylabel("Juta Rupiah")
+plt.grid(True, alpha=0.3)
+plt.show()
+
+# Bar chart
+df.plot.bar(x="month", y="revenue", figsize=(8, 5), color="steelblue")
+plt.title("Revenue per Bulan")
+plt.show()
+
+# Histogram dari kolom
+df["revenue"].plot.hist(bins=5, figsize=(8, 5))
+plt.show()
+```
+
+## Styling dan Customization
+
+```python
+import matplotlib.pyplot as plt
+
+fig, ax = plt.subplots(figsize=(10, 6))
+
+ax.plot([1, 2, 3, 4], [1, 4, 2, 3], marker="o", markersize=8)
+
+ax.set_title("Custom Chart", fontsize=16, fontweight="bold")
+ax.set_xlabel("X Axis", fontsize=12)
+ax.set_ylabel("Y Axis", fontsize=12)
+ax.set_xlim(0, 5)
+ax.set_ylim(0, 5)
+ax.spines["top"].set_visible(False)
+ax.spines["right"].set_visible(False)
+ax.annotate("Peak", xy=(2, 4), xytext=(2.5, 4.5),
+            arrowprops=dict(arrowstyle="->", color="red"))
+
+plt.tight_layout()
+plt.show()
+```
+
+## Object-Oriented API (Recommended)
+
+Gunakan `fig, ax = plt.subplots()` untuk kontrol lebih baik daripada pyplot stateful:
+
+```python
+import matplotlib.pyplot as plt
+import numpy as np
+
+fig, ax = plt.subplots(1, 1, figsize=(10, 5))
+ax.plot(np.arange(10), np.arange(10) ** 2)
+ax.set_title("OO Style")
+fig.savefig("chart.png", bbox_inches="tight", dpi=150)
+plt.close(fig)   # penting di script/server untuk free memory
+```
+
+## Latihan Praktis
+
+1. Visualisasikan data penjualan harian 30 hari dengan line chart + moving average
+2. Buat dashboard 2×2: histogram distribusi gaji, bar chart per departemen, scatter usia vs gaji, pie chart gender
+3. Plot fungsi kuadrat, kubik, dan eksponensial dalam satu chart dengan legend
+4. Export chart sebagai PNG 300 DPI untuk laporan
+
+## Rangkuman
+
+Matplotlib menyediakan semua jenis chart fundamental. Gunakan OO API (`fig, ax`) untuk kode maintainable, integrasikan dengan Pandas `.plot()` untuk workflow cepat. Selanjutnya: **pengenalan Machine Learning dengan scikit-learn**.

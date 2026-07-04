@@ -1,0 +1,337 @@
+---
+title: "Python Tutorial (11): Type Hints dan Developer Tooling"
+description: "Type annotations, generics, Protocol, mypy static analysis, ruff linter/formatter, pre-commit hooks, dan modern Python DX."
+date: "2026-04-20"
+series: "Python"
+tags: ["Python", "Expert", "Type Hints", "mypy", "ruff"]
+---
+
+Type hints membuat kode Python self-documenting, IDE lebih pintar, dan bug tertangkap sebelum runtime. Dikombinasikan dengan linter dan formatter modern, developer experience meningkat drastis.
+
+## Type Hints Dasar
+
+```python
+# Variables
+name: str = "Alice"
+age: int = 30
+scores: list[int] = [90, 85, 92]
+config: dict[str, str] = {"host": "localhost"}
+
+# Functions
+def greet(name: str, times: int = 1) -> str:
+    return f"Hello, {name}! " * times
+
+def process(items: list[int]) -> dict[str, int]:
+    return {"sum": sum(items), "count": len(items)}
+
+# None return
+def log(message: str) -> None:
+    print(f"[LOG] {message}")
+```
+
+Type hints **tidak** di-enforce runtime, mereka untuk tools (mypy, IDE, documentation).
+
+## Collection Types
+
+```python
+# Python 3.9+: builtin generics
+names: list[str] = ["Alice", "Bob"]
+mapping: dict[str, int] = {"a": 1}
+coords: tuple[float, float] = (3.14, 2.71)
+unique: set[str] = {"a", "b"}
+var_tuple: tuple[int, ...] = (1, 2, 3, 4)   # variable length
+
+# Nested
+matrix: list[list[int]] = [[1, 2], [3, 4]]
+registry: dict[str, list[tuple[str, int]]] = {}
+```
+
+## Optional dan Union
+
+```python
+from typing import Optional
+
+# Optional = Union[X, None]
+def find_user(user_id: int) -> Optional[dict]:
+    if user_id in database:
+        return database[user_id]
+    return None
+
+# Union (Python 3.10+ syntax)
+def process(value: int | str) -> str:
+    return str(value)
+
+# Old syntax (pre-3.10)
+from typing import Union
+def old_process(value: Union[int, str]) -> str:
+    return str(value)
+```
+
+## TypeAlias dan NewType
+
+```python
+from typing import TypeAlias, NewType
+
+# Type alias: readability
+JSON: TypeAlias = dict[str, "JSON"] | list["JSON"] | str | int | float | bool | None
+Headers: TypeAlias = dict[str, str]
+Callback: TypeAlias = Callable[[int, str], bool]
+
+# NewType: distinct type (stricter than alias)
+UserId = NewType("UserId", int)
+OrderId = NewType("OrderId", int)
+
+def get_user(user_id: UserId) -> dict:
+    pass
+
+uid = UserId(42)
+oid = OrderId(42)
+get_user(uid)     # OK
+get_user(oid)     # mypy error! OrderId != UserId
+```
+
+## Callable
+
+```python
+from typing import Callable
+
+# Function type
+Handler = Callable[[str, int], bool]
+
+def register(callback: Callable[[str], None]) -> None:
+    pass
+
+def retry(func: Callable[..., T], attempts: int = 3) -> T:
+    pass
+```
+
+## Generics
+
+```python
+from typing import TypeVar, Generic
+
+T = TypeVar("T")
+
+def first(items: list[T]) -> T:
+    return items[0]
+
+first([1, 2, 3])         # inferred: int
+first(["a", "b"])        # inferred: str
+
+
+# Generic class
+class Stack(Generic[T]):
+    def __init__(self) -> None:
+        self._items: list[T] = []
+
+    def push(self, item: T) -> None:
+        self._items.append(item)
+
+    def pop(self) -> T:
+        return self._items.pop()
+
+stack: Stack[int] = Stack()
+stack.push(42)       # OK
+stack.push("str")    # mypy error!
+```
+
+### Bounded TypeVar
+
+```python
+from typing import TypeVar
+from numbers import Number
+
+N = TypeVar("N", bound=Number)
+
+def double(x: N) -> N:
+    return x * 2   # type: ignore
+
+# Constrained
+StrOrBytes = TypeVar("StrOrBytes", str, bytes)
+
+def concat(a: StrOrBytes, b: StrOrBytes) -> StrOrBytes:
+    return a + b
+```
+
+## Protocol: Structural Subtyping
+
+```python
+from typing import Protocol, runtime_checkable
+
+
+@runtime_checkable
+class Renderable(Protocol):
+    def render(self) -> str: ...
+
+
+class HTMLWidget:
+    def render(self) -> str:
+        return "<div>Widget</div>"
+
+class MarkdownDoc:
+    def render(self) -> str:
+        return "# Document"
+
+
+def display(item: Renderable) -> None:
+    print(item.render())
+
+
+display(HTMLWidget())      # OK, has render() method
+display(MarkdownDoc())     # OK, structural typing
+```
+
+Protocol = duck typing + static checking. Tidak perlu inheritance eksplisit.
+
+## TypedDict
+
+```python
+from typing import TypedDict, Required, NotRequired
+
+
+class UserDict(TypedDict):
+    name: str
+    email: str
+    age: int
+    bio: NotRequired[str]
+
+
+def create_user(data: UserDict) -> None:
+    print(data["name"])     # OK, mypy knows it's str
+    print(data["phone"])    # mypy error! key not in TypedDict
+```
+
+## Literal dan Final
+
+```python
+from typing import Literal, Final
+
+def set_mode(mode: Literal["read", "write", "append"]) -> None:
+    pass
+
+set_mode("read")       # OK
+set_mode("delete")     # mypy error!
+
+MAX_RETRIES: Final = 3
+MAX_RETRIES = 5        # mypy error! can't reassign Final
+```
+
+## mypy: Static Type Checker
+
+```bash
+pip install mypy
+
+# Check
+mypy src/
+mypy src/main.py --strict
+
+# Configuration
+```
+
+```toml
+# pyproject.toml
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+disallow_untyped_defs = false
+```
+
+### Gradual Typing
+
+```python
+# type: ignore: suppress specific line
+result = sketchy_function()  # type: ignore[no-untyped-call]
+
+# reveal_type: debugging types
+reveal_type(my_variable)    # mypy will print the inferred type
+
+# cast: tell mypy "trust me"
+from typing import cast
+value = cast(int, get_value())
+```
+
+## ruff: Fast Linter + Formatter
+
+```bash
+pip install ruff
+
+# Lint
+ruff check src/
+ruff check src/ --fix   # auto-fix
+
+# Format (replaces black)
+ruff format src/
+ruff format --check src/
+```
+
+```toml
+# pyproject.toml
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "A", "C4", "SIM"]
+ignore = ["E501"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["myproject"]
+```
+
+ruff menggantikan flake8, isort, pyupgrade, dan banyak linter lain, 10-100x lebih cepat.
+
+## pre-commit: Git Hooks
+
+```bash
+pip install pre-commit
+```
+
+```yaml
+# .pre-commit-config.yaml
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.1.8
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.7.1
+    hooks:
+      - id: mypy
+        additional_dependencies: [types-requests]
+```
+
+```bash
+pre-commit install          # setup hooks
+pre-commit run --all-files  # manual run
+```
+
+## Modern Python DX Stack
+
+```text
+Package manager    → uv / Poetry
+Type checking      → mypy (strict)
+Linting + Format   → ruff
+Testing            → pytest + coverage
+Pre-commit         → pre-commit hooks
+CI                 → GitHub Actions
+```
+
+## Latihan Praktis
+
+1. Annotate module existing, jalankan `mypy --strict`, fix semua error
+2. Buat generic `Repository[T]` class dengan `get`, `list`, `create` methods
+3. Setup ruff + mypy + pre-commit di project
+4. Implementasi Protocol untuk plugin system (duck-typed interface)
+
+## Rangkuman
+
+Type hints + mypy = safety net static. ruff = linter+formatter blazing fast. pre-commit = enforcement otomatis. Stack ini membuat codebase Python maintainable at scale. Bug tertangkap sebelum runtime, format konsisten, dan code review fokus ke logic.

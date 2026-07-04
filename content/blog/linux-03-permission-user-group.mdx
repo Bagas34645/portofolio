@@ -1,0 +1,173 @@
+---
+title: "Linux Tutorial (3): Permission, User, dan Group"
+description: "Membaca chmod dan chown, permission oktal vs simbolik, SUID/SGID/sticky bit, serta manajemen user dengan useradd dan sudo."
+date: "2026-01-10"
+series: "Linux"
+tags: ["Linux", "Fundamental", "Permission", "Security"]
+---
+
+Linux dirancang sebagai sistem **multi-user**. Setiap file memiliki owner, group, dan permission yang menentukan siapa boleh membaca, menulis, atau mengeksekusi. Memahami model ini wajib sebelum mengelola server.
+
+## Model Permission rwx
+
+Setiap file/directori punya tiga set permission:
+
+```text
+-rwxr-xr--  1  alice  developers  4096  Mar 10  app.sh
+ │││││││││
+ ││││││└┴┴── Others: r-- (read only)
+ │││└┴┴───── Group:  r-x (read + execute)
+ └┴┴──────── Owner:  rwx (read + write + execute)
+```
+
+| Permission | File | Direktori |
+|------------|------|-----------|
+| `r` (4) | Baca isi | List isi direktori |
+| `w` (2) | Tulis/modifikasi | Buat/hapus file di dalamnya |
+| `x` (1) | Eksekusi sebagai program | Masuk (cd) ke direktori |
+
+## chmod: Oktal vs Simbolik
+
+```bash
+# Oktal: cepat dan presisi
+chmod 644 file.txt    # rw-r--r--
+chmod 755 script.sh   # rwxr-xr-x
+chmod 600 secret.key  # rw------- (hanya owner)
+
+# Simbolik: lebih readable
+chmod u+x script.sh           # owner +execute
+chmod g-w file.txt            # group -write
+chmod o=r file.txt            # others = read only
+chmod a+r public.txt          # all +read
+chmod -R u+rwX,g+rX,o-rwx project/  # recursive, X = execute only on dirs
+```
+
+**Angka oktal**: owner(4+2+1) + group(4+2+1) + others(4+2+1). Contoh `755` = `7` + `5` + `5`.
+
+## chown dan chgrp
+
+```bash
+# Ubah owner
+sudo chown alice file.txt
+
+# Ubah owner dan group sekaligus
+sudo chown alice:developers file.txt
+
+# Recursive
+sudo chown -R www-data:www-data /var/www/html
+
+# Ubah group saja
+chgrp developers shared-folder/
+```
+
+## Special Bits: SUID, SGID, Sticky
+
+```bash
+# SUID (4): proses dijalankan sebagai owner file, bukan user yang menjalankan
+# Contoh: /usr/bin/passwd (butuh write ke /etc/shadow)
+ls -l /usr/bin/passwd   # -rwsr-xr-x
+
+# SGID (2): file baru inherit group direktori
+chmod g+s /shared/project/
+ls -ld /shared/project/  # drwxrwsr-x
+
+# Sticky bit (1): hanya owner yang bisa hapus file di direktori
+# Contoh: /tmp
+ls -ld /tmp   # drwxrwxrwt
+```
+
+| Bit | Oktal | Efek |
+|-----|-------|------|
+| SUID | 4000 | Eksekusi sebagai owner |
+| SGID | 2000 | Inherit group / eksekusi sebagai group |
+| Sticky | 1000 | Hanya owner hapus file sendiri |
+
+## Manajemen User
+
+```bash
+# Buat user baru
+sudo useradd -m -s /bin/bash -G developers alice
+sudo passwd alice
+
+# Modifikasi user
+sudo usermod -aG docker alice    # tambah ke group (append!)
+sudo usermod -L alice            # lock account
+sudo usermod -U alice            # unlock
+
+# Hapus user (dengan home directory)
+sudo userdel -r alice
+
+# Info user
+id alice
+getent passwd alice
+groups alice
+```
+
+## Manajemen Group
+
+```bash
+sudo groupadd developers
+sudo groupadd -g 1500 custom-group   # GID spesifik
+sudo groupdel old-group
+getent group developers
+```
+
+## sudo: Delegasi Privilege
+
+File `/etc/sudoers` (edit via `visudo`, **jangan** pakai editor biasa):
+
+```text
+# Full sudo tanpa password (hati-hati!)
+alice ALL=(ALL) NOPASSWD: ALL
+
+# Batasi perintah spesifik
+deploy ALL=(ALL) NOPASSWD: /bin/systemctl restart nginx, /bin/systemctl reload nginx
+
+# Group-based
+%developers ALL=(ALL) ALL
+```
+
+```bash
+# Cek privilege sudo
+sudo -l
+
+# Jalankan sebagai user lain
+sudo -u www-data cat /var/log/nginx/error.log
+```
+
+## umask: Default Permission File Baru
+
+```bash
+umask          # default: 0022
+umask 0027     # lebih ketat: file 640, dir 750
+
+# Hitung: file = 666 - umask, dir = 777 - umask
+# umask 022 → file 644, dir 755
+```
+
+## ACL: Permission Lebih Granular
+
+Ketika permission standar owner/group/other tidak cukup:
+
+```bash
+# Set ACL
+setfacl -m u:bob:rwx /shared/report.pdf
+setfacl -m g:auditors:r-- /shared/report.pdf
+
+# Lihat ACL
+getfacl /shared/report.pdf
+
+# Default ACL untuk direktori (inherit ke file baru)
+setfacl -d -m g:developers:rwx /shared/project/
+```
+
+## Latihan Praktis
+
+1. Buat user `trainee`, group `training`, dan file shared dengan SGID
+2. Set permission `770` pada direktori shared, verifikasi user di group lain tidak bisa akses
+3. Buat script `deploy.sh`, set `chmod 750` dan owner `root:deploy`
+4. Konfigurasi sudoers agar user deploy hanya bisa restart nginx
+
+## Rangkuman
+
+Permission Linux adalah lapisan keamanan pertama. Kuasai `chmod`, `chown`, special bits, dan `sudo` sebelum masuk ke manajemen paket dan service di tutorial berikutnya.

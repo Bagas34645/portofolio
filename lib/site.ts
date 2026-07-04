@@ -15,7 +15,7 @@ export const siteConfig = {
     { href: "/about", label: "Tentang" },
     { href: "/projects", label: "Proyek" },
     { href: "/skills", label: "Keahlian" },
-    { href: "/blog", label: "Blog" },
+    { href: "/blog", label: "Tutorial" },
     { href: "/contact", label: "Kontak" },
   ],
 } as const;

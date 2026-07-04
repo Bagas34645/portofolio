@@ -1,0 +1,312 @@
+---
+title: "Python Tutorial (6): File I/O dan Exception Handling"
+description: "Membaca/menulis file teks dan binary, context manager, pathlib, try/except/finally, dan custom exception."
+date: "2026-03-25"
+series: "Python"
+tags: ["Python", "Intermediate", "File IO", "Exception"]
+---
+
+Interaksi dengan file dan penanganan error yang robust adalah skill esensial, dari parsing CSV sederhana hingga menulis aplikasi production yang graceful saat gagal.
+
+## Membaca File
+
+```python
+# Cara basic
+f = open("data.txt", "r")
+content = f.read()
+f.close()
+
+# Context manager (SELALU gunakan ini)
+with open("data.txt", "r") as f:
+    content = f.read()
+# File otomatis ditutup setelah blok with
+```
+
+```python
+# Baca seluruh isi
+with open("data.txt") as f:
+    content = f.read()          # string
+
+# Baca per baris
+with open("data.txt") as f:
+    lines = f.readlines()       # list of strings (termasuk \n)
+
+# Iterasi per baris (memory-efficient untuk file besar)
+with open("data.txt") as f:
+    for line in f:
+        print(line.strip())
+
+# Baca N karakter
+with open("data.txt") as f:
+    chunk = f.read(1024)
+```
+
+## Menulis File
+
+```python
+# Write (overwrite)
+with open("output.txt", "w") as f:
+    f.write("Baris pertama\n")
+    f.write("Baris kedua\n")
+
+# Append (tambah di akhir)
+with open("log.txt", "a") as f:
+    f.write(f"[{datetime.now()}] Event logged\n")
+
+# Write multiple lines
+lines = ["satu\n", "dua\n", "tiga\n"]
+with open("output.txt", "w") as f:
+    f.writelines(lines)
+
+# Print ke file
+with open("output.txt", "w") as f:
+    print("Hello, file!", file=f)
+```
+
+## Mode File
+
+| Mode | Fungsi |
+|------|--------|
+| `r` | Read (default) |
+| `w` | Write (overwrite) |
+| `a` | Append |
+| `x` | Exclusive create (error jika sudah ada) |
+| `b` | Binary mode |
+| `+` | Read + Write |
+
+```python
+# Binary file
+with open("image.png", "rb") as f:
+    data = f.read()
+
+with open("copy.png", "wb") as f:
+    f.write(data)
+```
+
+## pathlib: Modern File Operations
+
+```python
+from pathlib import Path
+
+# Path manipulation
+p = Path("data") / "output" / "result.csv"
+p.parent          # data/output
+p.name            # result.csv
+p.stem            # result
+p.suffix          # .csv
+
+# File operations
+p = Path("myfile.txt")
+p.write_text("Hello, pathlib!")
+content = p.read_text()
+p.exists()
+p.is_file()
+p.is_dir()
+p.unlink()        # delete
+
+# Directory operations
+Path("output").mkdir(parents=True, exist_ok=True)
+
+# Iterate files
+for f in Path(".").glob("**/*.py"):
+    print(f)
+
+# Home directory
+home = Path.home()
+config = home / ".config" / "myapp" / "settings.json"
+```
+
+## JSON
+
+```python
+import json
+
+# Write JSON
+data = {"name": "Alice", "scores": [90, 85, 92]}
+with open("data.json", "w") as f:
+    json.dump(data, f, indent=2)
+
+# Read JSON
+with open("data.json") as f:
+    loaded = json.load(f)
+
+# String conversion
+json_str = json.dumps(data, indent=2)
+parsed = json.loads(json_str)
+```
+
+## CSV
+
+```python
+import csv
+
+# Write CSV
+with open("users.csv", "w", newline="") as f:
+    writer = csv.writer(f)
+    writer.writerow(["name", "age", "city"])
+    writer.writerow(["Alice", 30, "Jakarta"])
+    writer.writerow(["Bob", 25, "Bandung"])
+
+# Read CSV
+with open("users.csv") as f:
+    reader = csv.DictReader(f)
+    for row in reader:
+        print(f"{row['name']} ({row['age']})")
+```
+
+## Exception Handling
+
+```python
+try:
+    result = 10 / 0
+except ZeroDivisionError:
+    print("Tidak bisa bagi dengan nol!")
+
+# Multiple exceptions
+try:
+    value = int(input("Angka: "))
+    result = 100 / value
+except ValueError:
+    print("Input bukan angka")
+except ZeroDivisionError:
+    print("Tidak bisa bagi nol")
+except (TypeError, AttributeError) as e:
+    print(f"Error: {e}")
+
+# else & finally
+try:
+    f = open("data.txt")
+    data = f.read()
+except FileNotFoundError:
+    print("File tidak ditemukan")
+else:
+    print(f"Berhasil baca {len(data)} karakter")
+finally:
+    print("Blok ini SELALU dieksekusi")
+```
+
+## Hierarki Exception
+
+```text
+BaseException
+ └── Exception
+      ├── ValueError
+      ├── TypeError
+      ├── KeyError
+      ├── IndexError
+      ├── FileNotFoundError
+      ├── IOError
+      ├── RuntimeError
+      └── ...
+```
+
+**Jangan** catch `BaseException` atau bare `except:` karena bisa menelan `KeyboardInterrupt` dan `SystemExit`.
+
+## Custom Exception
+
+```python
+class AppError(Exception):
+    """Base exception untuk aplikasi."""
+    pass
+
+class ValidationError(AppError):
+    """Input tidak valid."""
+    def __init__(self, field, message):
+        self.field = field
+        self.message = message
+        super().__init__(f"{field}: {message}")
+
+class NotFoundError(AppError):
+    """Resource tidak ditemukan."""
+    pass
+
+
+def create_user(name, age):
+    if not name:
+        raise ValidationError("name", "Nama tidak boleh kosong")
+    if age < 0:
+        raise ValidationError("age", "Umur tidak valid")
+    return {"name": name, "age": age}
+
+
+try:
+    user = create_user("", 25)
+except ValidationError as e:
+    print(f"Validation failed: {e.field} - {e.message}")
+except AppError as e:
+    print(f"Application error: {e}")
+```
+
+## Context Manager Custom
+
+```python
+from contextlib import contextmanager
+
+@contextmanager
+def timer(label):
+    """Ukur waktu eksekusi blok kode."""
+    import time
+    start = time.perf_counter()
+    try:
+        yield
+    finally:
+        elapsed = time.perf_counter() - start
+        print(f"{label}: {elapsed:.3f}s")
+
+
+with timer("Data processing"):
+    data = [x**2 for x in range(1_000_000)]
+```
+
+```python
+# Class-based context manager
+class DatabaseConnection:
+    def __init__(self, url):
+        self.url = url
+        self.conn = None
+
+    def __enter__(self):
+        self.conn = connect(self.url)
+        return self.conn
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if self.conn:
+            self.conn.close()
+        return False    # False = don't suppress exceptions
+
+
+with DatabaseConnection("postgres://localhost/db") as conn:
+    conn.execute("SELECT 1")
+```
+
+## Best Practices
+
+```python
+# EAFP (Easier to Ask Forgiveness than Permission): Pythonic
+try:
+    value = data["key"]
+except KeyError:
+    value = default
+
+# vs LBYL (Look Before You Leap): less Pythonic
+if "key" in data:
+    value = data["key"]
+else:
+    value = default
+```
+
+- Catch exception se-spesifik mungkin
+- Jangan gunakan exception untuk flow control normal
+- Log error sebelum re-raise: `logger.error(...); raise`
+- Gunakan context manager untuk resource cleanup
+
+## Latihan Praktis
+
+1. Buat script yang membaca CSV, transform data, dan tulis ke JSON
+2. Implementasi custom exception hierarchy untuk REST API (NotFound, Unauthorized, ValidationError)
+3. Buat context manager `atomic_write` yang tulis ke temp file dulu, lalu rename (avoid partial writes)
+4. Buat file logger yang append timestamp + message ke file log
+
+## Rangkuman
+
+File I/O dengan context manager aman dari resource leak. Exception handling yang tepat membuat program robust tanpa crash silently. Pattern EAFP + custom exception = kode Python production-ready.
