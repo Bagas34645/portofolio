@@ -116,6 +116,8 @@ export const awards: Award[] = [
     title: "Juara 1 Instruktur Komputer",
     detail:
       "Apresiasi GTK PAUD dan DIKMAS Berprestasi dan Berdedikasi Tingkat Kota Tegal",
+    certificateUrl: "/images/awards/juara1-instruktur-komputer-2019.jpg",
+    certificateFilename: "Juara 1 Instruktur Komputer 2019.jpg",
   },
 ];
 
